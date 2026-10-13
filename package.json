@@ -8,10 +8,12 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "update:legislators": "node scripts/update-legislators.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",
+    "motion": "^14.1.0",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",

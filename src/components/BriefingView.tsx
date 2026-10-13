@@ -3,9 +3,16 @@ import type { OfficialsResult } from "@/lib/officials";
 import type { Briefing } from "@/lib/schemas";
 import { FollowUpChat } from "./FollowUpChat";
 import { Officials } from "./Officials";
+import { Reveal } from "./site/Reveal";
+import { motion } from "motion/react";
 import { BulletList, CitationLink, ExternalLink, Section, SourceList } from "./ui";
 
-const card = "space-y-8 rounded-2xl border border-line bg-surface p-5 shadow-sm sm:p-7";
+const cardClass =
+  "space-y-8 rounded-3xl border border-line bg-surface p-5 shadow-[0_20px_50px_-40px_rgba(28,33,31,0.5)] sm:p-8";
+
+function Card({ children }: { children: React.ReactNode }) {
+  return <Reveal className={cardClass}>{children}</Reveal>;
+}
 
 export function BriefingView(props: {
   t: Dictionary;
@@ -20,7 +27,7 @@ export function BriefingView(props: {
   const { t, briefing: b } = props;
 
   const startOver = (
-    <button type="button" onClick={props.onStartOver} className="text-sm text-accent underline underline-offset-2">
+    <button type="button" onClick={props.onStartOver} className="text-sm font-medium text-brand underline underline-offset-4">
       ← {t.startOver}
     </button>
   );
@@ -29,11 +36,11 @@ export function BriefingView(props: {
     return (
       <div className="space-y-4">
         {startOver}
-        <div className={card}>
+        <Card>
           <Section title={t.outOfScope}>
             <p className="leading-relaxed">{b.out_of_scope_message}</p>
           </Section>
-        </div>
+        </Card>
       </div>
     );
   }
@@ -42,13 +49,13 @@ export function BriefingView(props: {
     <article className="space-y-6">
       {startOver}
 
-      <div className={card}>
+      <Card>
         <header className="space-y-3">
           {props.question && <p className="text-sm text-muted">“{props.question}”</p>}
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{b.title}</h1>
+          <h2 className="font-serif text-3xl leading-tight font-semibold tracking-tight sm:text-4xl">{b.title}</h2>
         </header>
         <Section title={t.summary}>
-          <p className="text-lg leading-relaxed">{b.summary}</p>
+          <p className="border-l-4 border-accent pl-4 text-lg leading-relaxed">{b.summary}</p>
         </Section>
         <div className="grid gap-8 md:grid-cols-2">
           {b.what_it_does.length > 0 && (
@@ -80,21 +87,28 @@ export function BriefingView(props: {
             </ul>
           </Section>
         )}
-      </div>
+      </Card>
 
       {b.perspectives.length > 0 && (
-        <div className={card}>
+        <Card>
           <Section title={t.perspectives} note={t.perspectivesNote}>
             <div className="grid gap-4 md:grid-cols-2">
               {b.perspectives.map((perspective, i) => (
-                <div key={i} className="space-y-3 rounded-xl border border-line p-4">
-                  <h3 className="font-semibold">{perspective.viewpoint}</h3>
+                <motion.div
+                  key={i}
+                  className="space-y-3 rounded-2xl border border-line bg-paper p-5"
+                  initial={{ opacity: 0, x: i % 2 === 0 ? -28 : 28 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true, margin: "0px 0px -60px 0px" }}
+                  transition={{ duration: 0.6, delay: 0.1 * i, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <h4 className="font-serif text-lg font-semibold">{perspective.viewpoint}</h4>
                   <p className="text-sm">
                     <span className="font-medium text-muted">{t.coreValues}: </span>
                     {perspective.core_values}
                   </p>
                   <BulletList items={perspective.main_arguments} />
-                </div>
+                </motion.div>
               ))}
             </div>
           </Section>
@@ -108,11 +122,11 @@ export function BriefingView(props: {
               <BulletList items={b.questions_to_consider} />
             </Section>
           )}
-        </div>
+        </Card>
       )}
 
       {b.key_terms.length > 0 && (
-        <div className={card}>
+        <Card>
           <Section title={t.keyTerms}>
             <dl className="grid gap-4 sm:grid-cols-2">
               {b.key_terms.map((term) => (
@@ -123,11 +137,11 @@ export function BriefingView(props: {
               ))}
             </dl>
           </Section>
-        </div>
+        </Card>
       )}
 
       {(props.state || b.leaders.length > 0) && (
-        <div className={card}>
+        <Card>
           {props.state && (
             <Section title={t.yourOfficials}>
               <Officials officials={props.officials} error={props.officialsError} t={t} />
@@ -146,11 +160,11 @@ export function BriefingView(props: {
               </ul>
             </Section>
           )}
-        </div>
+        </Card>
       )}
 
       {(b.helpful_websites.length > 0 || b.phone_numbers.length > 0) && (
-        <div className={card}>
+        <Card>
           {b.helpful_websites.length > 0 && (
             <Section title={t.websites}>
               <ul className="space-y-2">
@@ -171,7 +185,7 @@ export function BriefingView(props: {
                     <span className="font-semibold">{entry.organization}: </span>
                     <a
                       href={`tel:${entry.number.replace(/[^\d+]/g, "")}`}
-                      className="text-accent underline underline-offset-2"
+                      className="text-brand underline underline-offset-2"
                     >
                       {entry.number}
                     </a>
@@ -181,10 +195,10 @@ export function BriefingView(props: {
               </ul>
             </Section>
           )}
-        </div>
+        </Card>
       )}
 
-      <div className={card}>
+      <Card>
         {b.uncertainties.length > 0 && (
           <Section title={t.uncertainties}>
             <BulletList items={b.uncertainties} />
@@ -193,9 +207,9 @@ export function BriefingView(props: {
         <Section title={t.sources} note={b.sources.length > 0 ? t.sourcesNote : undefined}>
           <SourceList sources={b.sources} scope="b" t={t} />
         </Section>
-      </div>
+      </Card>
 
-      <div className={card}>
+      <Card>
         <Section title={t.followUpTitle}>
           <FollowUpChat
             t={t}
@@ -205,7 +219,7 @@ export function BriefingView(props: {
             briefing={b}
           />
         </Section>
-      </div>
+      </Card>
     </article>
   );
 }

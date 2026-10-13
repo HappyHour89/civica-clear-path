@@ -17,7 +17,7 @@ function OfficialCard({ official, label, t }: { official: FederalOfficial; label
       </p>
       <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-sm">
         {official.phone && (
-          <a href={`tel:${official.phone.replace(/[^\d+]/g, "")}`} className="text-accent underline underline-offset-2">
+          <a href={`tel:${official.phone.replace(/[^\d+]/g, "")}`} className="text-brand underline underline-offset-2">
             {t.call} {official.phone}
           </a>
         )}

@@ -5,7 +5,7 @@ export function Section(props: { title: string; children: React.ReactNode; note?
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="text-lg font-semibold">{props.title}</h2>
+        <h3 className="font-serif text-xl font-semibold">{props.title}</h3>
         {props.note && <p className="text-sm text-muted">{props.note}</p>}
       </div>
       {props.children}
@@ -29,7 +29,7 @@ export function ExternalLink(props: { href: string; children: React.ReactNode; c
       href={props.href}
       target="_blank"
       rel="noopener noreferrer"
-      className={props.className ?? "text-accent underline underline-offset-2 hover:opacity-80"}
+      className={props.className ?? "text-brand underline underline-offset-2 hover:opacity-80"}
     >
       {props.children}
     </a>
@@ -44,7 +44,7 @@ export function CitationLink(props: { scope: string; id: number }) {
   return (
     <a
       href={`#${sourceAnchor(props.scope, props.id)}`}
-      className="ml-0.5 align-super text-xs font-semibold text-accent no-underline hover:underline"
+      className="ml-0.5 align-super text-xs font-semibold text-brand no-underline hover:underline"
     >
       [{props.id}]
     </a>

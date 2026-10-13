@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { findOfficials, parseCensusDistrict, parseLegislators } from "./officials";
+import { countdownTo } from "./election";
+import { delegation, filterMembers, MEMBERS } from "./legislators";
+import { findOfficials, parseCensusDistrict } from "./officials";
 import { checkRateLimit } from "./rateLimit";
 import { BriefingSchema, toolInputSchema } from "./schemas";
 import { collectSearchResultUrls, isSafeHttpUrl, keepVerifiedSources, normalizeUrl } from "./sources";
 import { sampleBriefing } from "./testFixtures";
 import { fileToContentBlock } from "./upload";
+import { voteGovStateUrl } from "./vote";
+import { DISTRICT_MAPS, districtWinners, VOTER_GROUPS } from "../content/learn";
 
 describe("toolInputSchema", () => {
   function walk(node: unknown, visit: (obj: Record<string, unknown>) => void) {
@@ -63,20 +67,6 @@ describe("sources", () => {
   });
 });
 
-const legislatorsFixture = [
-  {
-    name: { first: "Ann", last: "Smith", official_full: "Ann Smith" },
-    terms: [
-      { type: "rep", state: "WY", district: 0, party: "Democrat" },
-      { type: "sen", state: "WY", party: "Independent", phone: "202-224-0001", url: "https://smith.senate.gov" },
-    ],
-  },
-  { name: { first: "Bo", last: "Lee" }, terms: [{ type: "rep", state: "WY", district: 0, party: "Republican", phone: "202-225-0002" }] },
-  { name: { first: "Cy", last: "Ng" }, terms: [{ type: "rep", state: "CA", district: 12, party: "Democrat" }] },
-  { name: { first: "Di", last: "Ro" }, terms: [{ type: "rep", state: "CA", district: 13, party: "Republican" }] },
-  { name: { first: "Ed", last: "Fa" }, terms: [{ type: "sen", state: "CA", party: "Democrat" }] },
-];
-
 function censusFixture(state: string, geography: Record<string, string>) {
   return {
     result: {
@@ -87,14 +77,33 @@ function censusFixture(state: string, geography: Record<string, string>) {
   };
 }
 
+describe("legislators snapshot", () => {
+  it("has a full, current Congress with names and offices", () => {
+    expect(MEMBERS.filter((m) => m.chamber === "senate")).toHaveLength(100);
+    expect(MEMBERS.filter((m) => m.chamber === "house").length).toBeGreaterThan(430);
+    expect(MEMBERS.every((m) => m.name.trim() && m.state && /^\d{4}$/.test(m.since))).toBe(true);
+    expect(new Set(MEMBERS.map((m) => m.id)).size).toBe(MEMBERS.length);
+  });
+
+  it("filters by chamber, state, party, and accent-insensitive name", () => {
+    const wy = filterMembers(MEMBERS, { state: "WY" });
+    expect(wy.filter((m) => m.chamber === "senate")).toHaveLength(2);
+    const anyName = MEMBERS[0].name;
+    const plain = anyName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    expect(filterMembers(MEMBERS, { query: plain }).map((m) => m.id)).toContain(MEMBERS[0].id);
+    const party = filterMembers(MEMBERS, { chamber: "house", party: "Republican" });
+    expect(party.every((m) => m.chamber === "house" && m.party === "Republican")).toBe(true);
+  });
+
+  it("orders a state's House members by district", () => {
+    const { house } = delegation(MEMBERS, "CA");
+    const districts = house.map((m) => m.district ?? 0);
+    expect(districts).toEqual([...districts].sort((a, b) => a - b));
+  });
+});
+
 describe("officials", () => {
   afterEach(() => vi.unstubAllGlobals());
-
-  it("uses each legislator's most recent term", () => {
-    const officials = parseLegislators(legislatorsFixture);
-    expect(officials[0]).toMatchObject({ name: "Ann Smith", chamber: "senate", district: null, phone: "202-224-0001" });
-    expect(officials[1]).toMatchObject({ name: "Bo Lee", chamber: "house", district: 0 });
-  });
 
   it("reads congressional districts from Census responses", () => {
     expect(parseCensusDistrict(censusFixture("CA", { CD119: "12", GEOID: "0612" }))).toEqual({ state: "CA", district: 12 });
@@ -105,34 +114,43 @@ describe("officials", () => {
     expect(parseCensusDistrict(null)).toBeNull();
   });
 
-  function stubFetch(census: unknown) {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (url: string | URL) =>
-        String(url).includes("census.gov")
-          ? Response.json(census)
-          : Response.json(legislatorsFixture),
-      ),
-    );
-  }
-
   it("finds the House member for a matched address", async () => {
-    stubFetch(censusFixture("CA", { CD119: "13" }));
-    const result = await findOfficials("CA", "1 Main St");
-    expect(result.senators.map((s) => s.name)).toEqual(["Ed Fa"]);
-    expect(result.representative?.name).toBe("Di Ro");
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json(censusFixture("CA", { CD119: "12" }))));
+    const result = await findOfficials("NY", "1 Main St");
+    expect(result.state).toBe("CA");
+    expect(result.senators).toHaveLength(2);
+    expect(result.representative).toMatchObject({ state: "CA", district: 12 });
     expect(result.addressMatched).toBe(true);
   });
 
-  it("shows the at-large member without an address and flags unmatched addresses", async () => {
-    stubFetch({ result: { addressMatches: [] } });
+  it("shows the at-large member without an address, and separates no-match from failure", async () => {
     const wyoming = await findOfficials("WY", null);
-    expect(wyoming.representative?.name).toBe("Bo Lee");
+    expect(wyoming.representative).toMatchObject({ state: "WY", district: 0 });
     expect(wyoming.addressMatched).toBeNull();
 
-    const california = await findOfficials("CA", "nowhere");
-    expect(california.representative).toBeNull();
-    expect(california.addressMatched).toBe(false);
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ result: { addressMatches: [] } })));
+    const noMatch = await findOfficials("CA", "nowhere");
+    expect(noMatch).toMatchObject({ representative: null, addressMatched: false, lookupFailed: false });
+
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("down", { status: 503 })));
+    const failed = await findOfficials("CA", "1 Main St");
+    expect(failed).toMatchObject({ representative: null, addressMatched: null, lookupFailed: true });
+  });
+});
+
+describe("election countdown", () => {
+  it("counts down to local midnight on November 3, 2026", () => {
+    // Only days are checked: clocks change on Nov 1 in many time zones, shifting the hours.
+    expect(countdownTo(new Date(2026, 9, 13, 12, 0, 0))).toMatchObject({ phase: "before", days: 20 });
+    expect(countdownTo(new Date(2026, 10, 2, 23, 59, 30))).toEqual({
+      phase: "before",
+      days: 0,
+      hours: 0,
+      minutes: 0,
+      seconds: 30,
+    });
+    expect(countdownTo(new Date(2026, 10, 3, 9))).toEqual({ phase: "today" });
+    expect(countdownTo(new Date(2026, 10, 4, 0, 0, 1))).toEqual({ phase: "after" });
   });
 });
 
@@ -162,5 +180,49 @@ describe("rate limit", () => {
     expect(checkRateLimit(key, 2, 1000, 10).allowed).toBe(true);
     expect(checkRateLimit(key, 2, 1000, 20)).toEqual({ allowed: false, retryAfterSeconds: 1 });
     expect(checkRateLimit(key, 2, 1000, 1000).allowed).toBe(true);
+  });
+});
+
+describe("vote links", () => {
+  it("builds vote.gov state pages matching the confirmed URLs", () => {
+    expect(voteGovStateUrl("CA")).toBe("https://vote.gov/register/california");
+    expect(voteGovStateUrl("NC")).toBe("https://vote.gov/register/north-carolina");
+    expect(voteGovStateUrl("DC")).toBe("https://vote.gov/register/district-of-columbia");
+    expect(voteGovStateUrl("VI")).toBe("https://vote.gov/register/us-virgin-islands");
+    expect(voteGovStateUrl("MP")).toBe("https://vote.gov/register/northern-mariana-islands");
+    expect(voteGovStateUrl("AS")).toBe("https://vote.gov/register/american-samoa");
+    expect(voteGovStateUrl("GU")).toBe("https://vote.gov/register");
+  });
+});
+
+describe("redistricting example maps", () => {
+  function connected(cells: number[]) {
+    const set = new Set(cells);
+    const seen = new Set([cells[0]]);
+    const queue = [cells[0]];
+    while (queue.length) {
+      const c = queue.pop()!;
+      const neighbors = [c - 5, c + 5, c % 5 ? c - 1 : -1, c % 5 < 4 ? c + 1 : -1];
+      for (const n of neighbors) {
+        if (set.has(n) && !seen.has(n)) {
+          seen.add(n);
+          queue.push(n);
+        }
+      }
+    }
+    return seen.size === cells.length;
+  }
+
+  it("has five equal, contiguous districts per map with the described outcomes", () => {
+    for (const map of DISTRICT_MAPS) {
+      for (let d = 0; d < 5; d++) {
+        const cells = map.flatMap((district, i) => (district === d ? [i] : []));
+        expect(cells).toHaveLength(5);
+        expect(connected(cells)).toBe(true);
+      }
+    }
+    const seatsForA = DISTRICT_MAPS.map((map) => districtWinners(map).filter((w) => w === "A").length);
+    expect(seatsForA).toEqual([3, 5, 2]);
+    expect(VOTER_GROUPS.filter((g) => g === "A")).toHaveLength(15);
   });
 });

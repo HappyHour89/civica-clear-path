@@ -2,7 +2,16 @@
 
 **Understand politics. Think for yourself.**
 
-Civica explains political and legal questions in plain language. For each question (or uploaded document) it shows:
+Civica explains political and legal questions in plain language. The site has six sections, each in English and Korean (`/en/...` and `/ko/...`):
+
+- **Home** — the mission, how Civica works, and entry points to every section
+- **Explain** — ask a question or upload a document (details below)
+- **Representatives** — every current member of Congress, with photos, filters, search, and "find my representatives"
+- **Vote** — a countdown to Election Day (Nov 3, 2026) and links to official registration and voting pages
+- **Learn** — short guides with interactive visuals, plus a bilingual glossary
+- **About** — how explanations are generated, the neutrality policy, and data sources
+
+For each question on the Explain page, Civica shows:
 
 - a short summary, what the policy or law actually does, and why it matters
 - key facts, each linked to a source that was actually retrieved during research
@@ -56,19 +65,39 @@ Follow-up chat           ──────►  /api/followup   ─────�
 
 | Path | What it is |
 |---|---|
-| `src/app/page.tsx`, `src/components/` | The pages and UI pieces |
+| `src/app/[lang]/` | One folder per page; `[lang]` is `en` or `ko` |
+| `src/proxy.ts` | Sends `/` to `/en` or `/ko` (saved choice, then browser language) |
+| `src/components/` | UI pieces; `site/` holds the header, logo, and animation helpers |
+| `src/components/vendor/InfiniteSpiral.tsx` | The React Bits spiral (license notice inside) |
+| `src/content/` | Learn guides and glossary, English and Korean side by side |
+| `src/data/legislators.json` | Saved copy of the members-of-Congress data |
 | `src/app/api/*/route.ts` | The three server endpoints |
 | `src/lib/claude.ts` | Talks to Claude; handles retries and errors |
 | `src/lib/prompts.ts` | Civica's instructions to Claude (neutrality, accuracy, safety) |
 | `src/lib/schemas.ts` | The exact shape of an answer |
-| `src/lib/i18n.ts` | All interface text, in English and Korean |
+| `src/lib/i18n.ts` | All interface text, in English and Korean (lines marked `TODO(ko-review)` need a native check) |
+| `src/lib/vote.ts` | Official voting links |
 | `src/lib/officials.ts` | Members of Congress and district lookup |
 | `src/lib/upload.ts` | File checks (type, size) |
 | `src/lib/rateLimit.ts` | Limits how often one visitor can ask |
 
+### Updating the members of Congress
+
+The directory reads a saved copy of the [congress-legislators](https://github.com/unitedstates/congress-legislators) data, so the site never depends on GitHub at runtime. When Congress changes (new members, resignations, special elections), run:
+
+```bash
+npm run update:legislators
+```
+
+then commit the updated `src/data/legislators.json`. The "Data last updated" date on the site comes from this file.
+
+### Animations
+
+Animations use [Motion](https://motion.dev). The home page spiral is [React Bits' Infinite Spiral](https://reactbits.dev/components/infinite-spiral) (MIT + Commons Clause: fine to use in this site, not to resell on its own). Visitors who turn on "reduce motion" in their device settings get a still page.
+
 ### Adding a language (e.g. Mandarin)
 
-Add an entry to `LANGUAGES` and a full dictionary to `DICTIONARIES` in `src/lib/i18n.ts`. The TypeScript checker will point out any missing text.
+Add an entry to `LANGUAGES` and a full dictionary to `DICTIONARIES` in `src/lib/i18n.ts`, and a third language to each entry in `src/content/`. The TypeScript checker will point out any missing text.
 
 ## Checks
 
@@ -93,6 +122,7 @@ Each question makes one or more Claude requests with up to six web searches. Exp
 
 ## Known limitations
 
+- The Vote page doesn't list state deadlines yet: Civica only shows dates checked against an official source, and none have been checked. It links to official pages instead.
 - Officials lookup covers U.S. Congress only. State and local leaders, websites, and phone numbers come from Claude's web search, so double-check phone numbers before calling.
 - Server error messages beyond the common ones are only in English.
 - Follow-up questions see the briefing but not the original uploaded file.

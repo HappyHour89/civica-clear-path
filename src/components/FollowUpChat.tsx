@@ -60,7 +60,7 @@ export function FollowUpChat(props: {
         <ol className="space-y-4">
           {turns.map((turn, i) =>
             turn.role === "user" ? (
-              <li key={i} className="ml-auto max-w-[85%] rounded-2xl bg-accent-soft px-4 py-2">
+              <li key={i} className="ml-auto max-w-[85%] rounded-2xl bg-brand-soft px-4 py-2">
                 <span className="sr-only">{t.you}: </span>
                 {turn.content}
               </li>
@@ -91,7 +91,7 @@ export function FollowUpChat(props: {
               type="button"
               disabled={loading}
               onClick={() => send(suggestion)}
-              className="rounded-full border border-line px-3 py-1 text-left text-sm hover:border-accent hover:text-accent disabled:opacity-60"
+              className="rounded-full border border-line px-3 py-1 text-left text-sm hover:border-brand hover:text-brand disabled:opacity-60"
             >
               {suggestion}
             </button>
@@ -101,7 +101,7 @@ export function FollowUpChat(props: {
 
       {loading && (
         <p role="status" className="flex items-center gap-2 text-sm text-muted">
-          <span className="inline-block size-3 animate-pulse rounded-full bg-accent" aria-hidden />
+          <span className="inline-block size-3 animate-pulse rounded-full bg-brand" aria-hidden />
           {t.submitting}
         </p>
       )}
@@ -133,7 +133,7 @@ export function FollowUpChat(props: {
         <button
           type="submit"
           disabled={loading || !draft.trim()}
-          className="rounded-lg bg-accent px-4 py-2 font-semibold text-accent-ink hover:opacity-90 disabled:opacity-60"
+          className="rounded-lg bg-brand px-4 py-2 font-semibold text-brand-ink hover:opacity-90 disabled:opacity-60"
         >
           {t.send}
         </button>

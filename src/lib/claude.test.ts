@@ -85,6 +85,68 @@ describe("research", () => {
     expect(tools[1]).toMatchObject({ name: "submit_answer", strict: true });
   });
 
+  it("sends a plain Messages request to Meta AI when CIVICA_PROVIDER=meta", async () => {
+    process.env.CIVICA_PROVIDER = "meta";
+    process.env.META_AI_API_KEY = "meta-key";
+    try {
+      const spy = mockResponses({ stop_reason: "tool_use", content: [toolCall("submit_answer", followUp)] });
+      await research({
+        messages: [{ role: "user", content: "q" }],
+        toolName: "submit_answer",
+        toolDescription: "d",
+        schema: FollowUpSchema,
+        maxSearches: 3,
+      });
+      const params = spy.mock.calls[0][0] as unknown as Record<string, unknown>;
+      expect(params.model).toBe("muse-wonder-1.0");
+      expect(params).not.toHaveProperty("betas");
+      expect(params).not.toHaveProperty("fallbacks");
+      expect(params).not.toHaveProperty("output_config");
+      const client = spy.mock.contexts[0] as unknown as { _client: Anthropic };
+      expect(client._client.baseURL).toBe("https://api.meta.ai");
+      expect(client._client.authToken).toBe("meta-key");
+      expect(client._client.apiKey).toBeNull();
+    } finally {
+      delete process.env.CIVICA_PROVIDER;
+      delete process.env.META_AI_API_KEY;
+    }
+  });
+
+  it("can turn web search off for providers that lack it", async () => {
+    process.env.CIVICA_WEB_SEARCH = "off";
+    try {
+      const spy = mockResponses({ stop_reason: "tool_use", content: [toolCall("submit_answer", followUp)] });
+      await research({
+        messages: [{ role: "user", content: "q" }],
+        toolName: "submit_answer",
+        toolDescription: "d",
+        schema: FollowUpSchema,
+        maxSearches: 3,
+      });
+      const params = spy.mock.calls[0][0] as unknown as { tools: { name: string }[] };
+      expect(params.tools.map((t) => t.name)).toEqual(["submit_answer"]);
+    } finally {
+      delete process.env.CIVICA_WEB_SEARCH;
+    }
+  });
+
+  it("names the Meta key when it is missing", async () => {
+    process.env.CIVICA_PROVIDER = "meta";
+    try {
+      const error = await research({
+        messages: [],
+        toolName: "t",
+        toolDescription: "d",
+        schema: FollowUpSchema,
+        maxSearches: 1,
+      }).catch((e) => e);
+      expect(error).toBeInstanceOf(CivicaError);
+      expect(error.message).toContain("META_AI_API_KEY");
+    } finally {
+      delete process.env.CIVICA_PROVIDER;
+    }
+  });
+
   it("asks for the tool when Claude answers in prose", async () => {
     const prose = { stop_reason: "end_turn", content: [{ type: "text", text: "Here is an answer" }] };
     const spy = mockResponses(prose, { stop_reason: "tool_use", content: [toolCall("submit_answer", followUp)] });

@@ -4,7 +4,6 @@ import { SYSTEM_PROMPT } from "./prompts";
 import { collectSearchResultUrls } from "./sources";
 import { toolInputSchema } from "./schemas";
 
-const MODEL = "claude-opus-5-5";
 const MAX_ROUNDS = 5;
 
 export class CivicaError extends Error {
@@ -16,14 +15,53 @@ export class CivicaError extends Error {
   }
 }
 
-let client: Anthropic | null = null;
+// Civica can run on Claude (default) or on Meta AI's Anthropic-compatible
+// Messages API. Set CIVICA_PROVIDER=meta and META_AI_API_KEY to use Meta.
+type Provider = {
+  name: "anthropic" | "meta";
+  model: string;
+  keyVar: string;
+  // Anthropic-only request features: the server-side fallback beta and effort.
+  anthropicExtras: boolean;
+  webSearch: boolean;
+  createClient: () => Anthropic;
+};
 
-function getClient() {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new CivicaError("The server is missing its ANTHROPIC_API_KEY setting.", 500);
+export function getProvider(env: NodeJS.ProcessEnv = process.env): Provider {
+  const webSearch = env.CIVICA_WEB_SEARCH !== "off";
+  if (env.CIVICA_PROVIDER === "meta") {
+    return {
+      name: "meta",
+      model: env.CIVICA_MODEL || "muse-wonder-1.0",
+      keyVar: "META_AI_API_KEY",
+      anthropicExtras: false,
+      webSearch,
+      createClient: () =>
+        new Anthropic({
+          baseURL: env.META_AI_BASE_URL || "https://api.meta.ai",
+          apiKey: null,
+          authToken: env.META_AI_API_KEY,
+        }),
+    };
   }
-  client ??= new Anthropic();
-  return client;
+  return {
+    name: "anthropic",
+    model: env.CIVICA_MODEL || "claude-opus-5-5",
+    keyVar: "ANTHROPIC_API_KEY",
+    anthropicExtras: true,
+    webSearch,
+    createClient: () => new Anthropic(),
+  };
+}
+
+let cached: { name: Provider["name"]; client: Anthropic } | null = null;
+
+function getClient(provider: Provider) {
+  if (!process.env[provider.keyVar]) {
+    throw new CivicaError(`The server is missing its ${provider.keyVar} setting.`, 500);
+  }
+  if (cached?.name !== provider.name) cached = { name: provider.name, client: provider.createClient() };
+  return cached.client;
 }
 
 export async function research<T>(options: {
@@ -82,25 +120,31 @@ async function callClaude(options: {
   schema: z.ZodType;
   maxSearches: number;
 }) {
+  const provider = getProvider();
+  const tools: Anthropic.Beta.BetaToolUnion[] = [
+    {
+      name: options.toolName,
+      description: options.toolDescription,
+      strict: true,
+      input_schema: toolInputSchema(options.schema),
+    },
+  ];
+  if (provider.webSearch) {
+    tools.unshift({ type: "web_search_20260209", name: "web_search", max_uses: options.maxSearches });
+  }
   try {
-    return await getClient().beta.messages.create({
-      model: MODEL,
+    return await getClient(provider).beta.messages.create({
+      model: provider.model,
       max_tokens: 16000,
-      // If a safety classifier declines, the API retries on its recommended
-      // fallback model inside the same call instead of failing outright.
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: { effort: "medium" },
+      ...(provider.anthropicExtras && {
+        // If a safety classifier declines, the API retries on its recommended
+        // fallback model inside the same call instead of failing outright.
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+        output_config: { effort: "medium" },
+      }),
       system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-      tools: [
-        { type: "web_search_20260209", name: "web_search", max_uses: options.maxSearches },
-        {
-          name: options.toolName,
-          description: options.toolDescription,
-          strict: true,
-          input_schema: toolInputSchema(options.schema),
-        },
-      ],
+      tools,
       tool_choice: { type: "auto" },
       messages: options.messages,
     });
@@ -112,7 +156,7 @@ async function callClaude(options: {
 function toCivicaError(error: unknown): CivicaError {
   if (error instanceof CivicaError) return error;
   if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
-    console.error("Anthropic credentials rejected", error.message);
+    console.error("AI provider credentials rejected", error.message);
     return new CivicaError("The server's AI credentials are invalid.", 500);
   }
   if (error instanceof Anthropic.RateLimitError) {

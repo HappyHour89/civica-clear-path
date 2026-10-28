@@ -77,7 +77,9 @@ Follow-up chat           ──────►  /api/followup   ─────�
 
 | Path | What it is |
 |---|---|
-| `src/app/page.tsx`, `src/components/` | The pages and UI pieces |
+| `src/app/*/page.tsx` | One page per menu item: Ask (`/`), Explain a document, My representatives, Your briefing (with its own section tabs), About |
+| `src/components/CivicaProvider.tsx` | State shared across pages: language, your state, the current briefing and follow-up chat |
+| `src/components/` | The menu (`SiteShell.tsx`), forms, and briefing sections |
 | `src/app/api/*/route.ts` | The three server endpoints |
 | `src/lib/claude.ts` | Talks to Claude or Meta AI (`CIVICA_PROVIDER`); handles retries and errors |
 | `src/lib/prompts.ts` | Civica's instructions to Claude (neutrality, accuracy, safety) |

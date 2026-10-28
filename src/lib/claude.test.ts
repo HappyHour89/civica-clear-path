@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Messages } from "@anthropic-ai/sdk/resources/beta/messages/messages";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as askRoute } from "../app/api/ask/route";
-import { CivicaError, research } from "./claude";
+import { CivicaError, research, resetProviderStateForTests } from "./claude";
 import { BriefingSchema, FollowUpSchema } from "./schemas";
 import { sampleBriefing } from "./testFixtures";
 
@@ -33,6 +33,7 @@ const followUp = { answer: "Cloture needs 60 votes [1].", sources: [] };
 describe("research", () => {
   beforeEach(() => {
     process.env.ANTHROPIC_API_KEY = "test-key";
+    resetProviderStateForTests();
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -110,6 +111,51 @@ describe("research", () => {
       delete process.env.CIVICA_PROVIDER;
       delete process.env.META_AI_API_KEY;
     }
+  });
+
+  it("retries Meta with a minimal request after a 400, and keeps using it", async () => {
+    process.env.CIVICA_PROVIDER = "meta";
+    process.env.META_AI_API_KEY = "meta-key";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const spy = vi.spyOn(Messages.prototype, "create");
+      spy.mockRejectedValueOnce(new Anthropic.BadRequestError(400, undefined, "unknown tool type", new Headers()));
+      spy.mockResolvedValue({ stop_reason: "tool_use", content: [toolCall("submit_answer", followUp)] } as never);
+      const options = {
+        messages: [{ role: "user" as const, content: "q" }],
+        toolName: "submit_answer",
+        toolDescription: "d",
+        schema: FollowUpSchema,
+        maxSearches: 3,
+      };
+      const { data } = await research(options);
+      expect(data).toEqual(followUp);
+      await research(options);
+
+      type Params = { tools: { name: string; strict?: boolean }[]; system: unknown };
+      const [full, retry, next] = spy.mock.calls.map((call) => call[0] as unknown as Params);
+      expect(full.tools.map((t) => t.name)).toEqual(["web_search", "submit_answer"]);
+      for (const minimal of [retry, next]) {
+        expect(minimal.tools).toHaveLength(1);
+        expect(minimal.tools[0]).not.toHaveProperty("strict");
+        expect(typeof minimal.system).toBe("string");
+      }
+      expect(spy).toHaveBeenCalledTimes(3);
+    } finally {
+      delete process.env.CIVICA_PROVIDER;
+      delete process.env.META_AI_API_KEY;
+    }
+  });
+
+  it("does not retry Claude after a 400", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const spy = vi
+      .spyOn(Messages.prototype, "create")
+      .mockRejectedValueOnce(new Anthropic.BadRequestError(400, undefined, "bad", new Headers()));
+    await expect(
+      research({ messages: [], toolName: "t", toolDescription: "d", schema: FollowUpSchema, maxSearches: 1 }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it("can turn web search off for providers that lack it", async () => {

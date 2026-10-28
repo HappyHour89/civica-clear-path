@@ -53,6 +53,12 @@ export async function POST(request: Request) {
       toolDescription: "Submit the finished, neutral civic briefing for the user's question.",
       schema: BriefingSchema,
       maxSearches: 6,
+    }).catch((error) => {
+      // A rejected request with a file attached is most often the file itself.
+      if (hasFile && error instanceof CivicaError && error.status === 400) {
+        throw new CivicaError("The file couldn't be processed. Try a smaller or different one.", 400);
+      }
+      throw error;
     });
 
     const sources = keepVerifiedSources(data.sources, searchedUrls);

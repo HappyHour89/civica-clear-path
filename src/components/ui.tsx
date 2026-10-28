@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Dictionary } from "@/lib/i18n";
 import type { Source } from "@/lib/schemas";
 
@@ -40,12 +41,19 @@ export function sourceAnchor(scope: string, id: number) {
   return `${scope}-src-${id}`;
 }
 
-export function CitationLink(props: { scope: string; id: number }) {
+// `page` points the link at sources listed on another page of the app.
+export function CitationLink(props: { scope: string; id: number; page?: string }) {
+  const className = "ml-0.5 align-super text-xs font-semibold text-accent no-underline hover:underline";
+  const hash = `#${sourceAnchor(props.scope, props.id)}`;
+  if (props.page) {
+    return (
+      <Link href={`${props.page}${hash}`} className={className}>
+        [{props.id}]
+      </Link>
+    );
+  }
   return (
-    <a
-      href={`#${sourceAnchor(props.scope, props.id)}`}
-      className="ml-0.5 align-super text-xs font-semibold text-accent no-underline hover:underline"
-    >
+    <a href={hash} className={className}>
       [{props.id}]
     </a>
   );
@@ -85,5 +93,17 @@ export function SourceList(props: { sources: Source[]; scope: string; t: Diction
         </li>
       ))}
     </ol>
+  );
+}
+
+export const inputClass =
+  "w-full rounded-lg border border-line bg-surface px-3 py-2 text-ink placeholder:text-muted/70 disabled:opacity-60";
+
+export function PageIntro(props: { title: string; intro?: string }) {
+  return (
+    <div className="space-y-2">
+      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{props.title}</h1>
+      {props.intro && <p className="max-w-2xl text-lg leading-relaxed text-muted">{props.intro}</p>}
+    </div>
   );
 }

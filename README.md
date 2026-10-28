@@ -29,6 +29,27 @@ The interface is available in English and Korean. Answers are written in the lan
 
 5. Open http://localhost:3000.
 
+## Running on Meta AI
+
+Civica can use Meta AI's Anthropic-compatible Messages API instead of Claude. In `.env.local` (or on Vercel):
+
+```
+CIVICA_PROVIDER=meta
+META_AI_API_KEY=your-meta-key
+# CIVICA_MODEL=muse-wonder-1.0   (default)
+```
+
+In Meta mode Civica sends a plain Messages request to `https://api.meta.ai`: the key goes in an `Authorization: Bearer` header, and the Claude-only settings (server-side fallback, effort) are left out. Web search stays on, because source checking depends on it. If Meta rejects the `web_search` tool, set `CIVICA_WEB_SEARCH=off`. Answers still work, but no source can be verified, so every fact shows as unsourced.
+
+Quick check that your key and model work:
+
+```bash
+curl https://api.meta.ai/v1/messages \
+  -H "Authorization: Bearer $META_AI_API_KEY" -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -d '{"model":"muse-wonder-1.0","max_tokens":50,"messages":[{"role":"user","content":"Say hi"}]}'
+```
+
 ## Putting it online (Vercel)
 
 1. Sign in at [vercel.com](https://vercel.com) with your GitHub account and choose **Add New → Project**, then pick this repository.
@@ -56,9 +77,11 @@ Follow-up chat           ──────►  /api/followup   ─────�
 
 | Path | What it is |
 |---|---|
-| `src/app/page.tsx`, `src/components/` | The pages and UI pieces |
+| `src/app/*/page.tsx` | One page per menu item: Ask (`/`), Explain a document, My representatives, Your briefing (with its own section tabs), About |
+| `src/components/CivicaProvider.tsx` | State shared across pages: language, your state, the current briefing and follow-up chat |
+| `src/components/` | The menu (`SiteShell.tsx`), forms, and briefing sections |
 | `src/app/api/*/route.ts` | The three server endpoints |
-| `src/lib/claude.ts` | Talks to Claude; handles retries and errors |
+| `src/lib/claude.ts` | Talks to Claude or Meta AI (`CIVICA_PROVIDER`); handles retries and errors |
 | `src/lib/prompts.ts` | Civica's instructions to Claude (neutrality, accuracy, safety) |
 | `src/lib/schemas.ts` | The exact shape of an answer |
 | `src/lib/i18n.ts` | All interface text, in English and Korean |

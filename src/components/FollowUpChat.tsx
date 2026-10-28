@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { askFollowUp, type ChatTurn } from "@/lib/client";
+import { askFollowUp } from "@/lib/client";
 import type { Dictionary, Language } from "@/lib/i18n";
 import type { Briefing } from "@/lib/schemas";
+import { useCivica } from "./CivicaProvider";
 import { CitedText, SourceList } from "./ui";
 
 export function FollowUpChat(props: {
@@ -14,7 +15,8 @@ export function FollowUpChat(props: {
   briefing: Briefing;
 }) {
   const { t } = props;
-  const [turns, setTurns] = useState<ChatTurn[]>([]);
+  // Kept in the provider so the conversation survives switching pages.
+  const { turns, setTurns } = useCivica();
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

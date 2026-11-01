@@ -158,6 +158,32 @@ describe("research", () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
+  it("uses Meta mode for the Claude Code-style ANTHROPIC_BASE_URL setup", async () => {
+    const saved = { ...process.env };
+    delete process.env.ANTHROPIC_API_KEY;
+    process.env.ANTHROPIC_BASE_URL = "https://api.meta.ai";
+    process.env.ANTHROPIC_AUTH_TOKEN = "meta-token";
+    process.env.ANTHROPIC_MODEL = "muse-wonder-1.0";
+    try {
+      const spy = mockResponses({ stop_reason: "tool_use", content: [toolCall("submit_answer", followUp)] });
+      await research({
+        messages: [{ role: "user", content: "q" }],
+        toolName: "submit_answer",
+        toolDescription: "d",
+        schema: FollowUpSchema,
+        maxSearches: 3,
+      });
+      const params = spy.mock.calls[0][0] as unknown as Record<string, unknown>;
+      expect(params.model).toBe("muse-wonder-1.0");
+      expect(params).not.toHaveProperty("betas");
+      const client = spy.mock.contexts[0] as unknown as { _client: Anthropic };
+      expect(client._client.baseURL).toBe("https://api.meta.ai");
+      expect(client._client.authToken).toBe("meta-token");
+    } finally {
+      process.env = saved;
+    }
+  });
+
   it("can turn web search off for providers that lack it", async () => {
     process.env.CIVICA_WEB_SEARCH = "off";
     try {

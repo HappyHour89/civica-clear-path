@@ -1,15 +1,17 @@
 "use client";
 
+import { LayoutGroup, motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Dictionary } from "@/lib/i18n";
 import type { Briefing } from "@/lib/schemas";
 import { useCivica } from "./CivicaProvider";
 import { FollowUpChat } from "./FollowUpChat";
+import { Dots, ProgressBar, spring, Stagger, StaggerItem } from "./motion";
 import { Officials } from "./Officials";
-import { BulletList, CitationLink, ExternalLink, Section, SourceList } from "./ui";
+import { BulletList, cardClass, CitationLink, ExternalLink, Section, SourceList } from "./ui";
 
-const card = "space-y-8 rounded-2xl border border-line bg-surface p-5 shadow-sm sm:p-7";
+const card = `${cardClass} space-y-8`;
 
 // Citations in the briefing point at the Sources page.
 const SOURCES_PATH = "/briefing/sources";
@@ -40,10 +42,12 @@ export function BriefingFrame({ children }: { children: React.ReactNode }) {
       <div className={card}>
         <Section title={t.noBriefingTitle}>
           {asking ? (
-            <p role="status" className="flex items-center gap-2 text-muted">
-              <span className="inline-block size-3 animate-pulse rounded-full bg-accent" aria-hidden />
-              {t.briefingInProgress}
-            </p>
+            <div role="status" className="space-y-3">
+              <ProgressBar />
+              <p className="flex items-center gap-2 text-muted">
+                <Dots /> {t.briefingInProgress}
+              </p>
+            </div>
           ) : (
             <p className="text-muted">
               {t.noBriefingBody}{" "}
@@ -76,35 +80,51 @@ export function BriefingFrame({ children }: { children: React.ReactNode }) {
     <article className="space-y-6">
       <header className="space-y-2">
         {result.question && <p className="text-sm text-muted">“{result.question}”</p>}
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{b.title}</h1>
+        <motion.h1
+          key={b.title}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-3xl font-bold tracking-tight sm:text-4xl"
+        >
+          {b.title}
+        </motion.h1>
         {asking && (
           <p role="status" className="flex items-center gap-2 text-sm text-muted">
-            <span className="inline-block size-2 animate-pulse rounded-full bg-accent" aria-hidden />
-            {t.briefingInProgress}
+            <Dots /> {t.briefingInProgress}
           </p>
         )}
       </header>
       <nav aria-label={t.briefingSections} className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <ul className="flex min-w-max gap-1 border-b border-line">
-          {tabs(t).map((tab) => {
-            const active = pathname === tab.href;
-            return (
-              <li key={tab.href}>
-                <Link
-                  href={tab.href}
-                  aria-current={active ? "page" : undefined}
-                  className={`-mb-px block border-b-2 px-3 py-2 text-sm font-medium ${
-                    active ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
-                  }`}
-                >
-                  {tab.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        <LayoutGroup id="briefing-tabs">
+          <ul className="flex min-w-max gap-1 border-b border-line">
+            {tabs(t).map((tab) => {
+              const active = pathname === tab.href;
+              return (
+                <li key={tab.href}>
+                  <Link
+                    href={tab.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`relative block px-3 py-2.5 text-sm font-medium transition-colors ${
+                      active ? "text-accent" : "text-muted hover:text-ink"
+                    }`}
+                  >
+                    {tab.label}
+                    {active && (
+                      <motion.span
+                        layoutId="tab-underline"
+                        className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-accent"
+                        transition={spring}
+                      />
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </LayoutGroup>
       </nav>
-      <div className={card}>{children}</div>
+      {/* Spacing between sections comes from app/briefing/template.tsx. */}
+      <div className={cardClass}>{children}</div>
     </article>
   );
 }
@@ -172,18 +192,21 @@ export function PerspectivesSection() {
   return (
     <>
       <Section title={t.perspectives} note={t.perspectivesNote}>
-        <div className="grid gap-4 md:grid-cols-2">
+        <Stagger className="grid gap-4 md:grid-cols-2">
           {b.perspectives.map((perspective, i) => (
-            <div key={i} className="space-y-3 rounded-xl border border-line p-4">
+            <StaggerItem
+              key={i}
+              className="space-y-3 rounded-2xl border border-line bg-canvas/40 p-4 transition-[border-color,transform,box-shadow] hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-lg"
+            >
               <h3 className="font-semibold">{perspective.viewpoint}</h3>
               <p className="text-sm">
                 <span className="font-medium text-muted">{t.coreValues}: </span>
                 {perspective.core_values}
               </p>
               <BulletList items={perspective.main_arguments} />
-            </div>
+            </StaggerItem>
           ))}
-        </div>
+        </Stagger>
       </Section>
       {b.common_ground.length > 0 && (
         <Section title={t.commonGround}>
@@ -206,14 +229,14 @@ export function TermsSection() {
   if (b.key_terms.length === 0) return <Empty text={t.nothingHere} />;
   return (
     <Section title={t.keyTerms}>
-      <dl className="grid gap-4 sm:grid-cols-2">
+      <Stagger as="dl" className="grid gap-4 sm:grid-cols-2">
         {b.key_terms.map((term) => (
-          <div key={term.term}>
+          <StaggerItem key={term.term} className="rounded-2xl border border-line/70 p-4">
             <dt className="font-semibold">{term.term}</dt>
             <dd className="text-sm leading-relaxed text-muted">{term.definition}</dd>
-          </div>
+          </StaggerItem>
         ))}
-      </dl>
+      </Stagger>
     </Section>
   );
 }

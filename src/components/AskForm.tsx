@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { US_STATES } from "@/lib/states";
 import { useCivica, type AskInput } from "./CivicaProvider";
-import { inputClass, PageIntro } from "./ui";
+import { Button, Collapse, Dots, ProgressBar, Reveal, Stagger, StaggerItem } from "./motion";
+import { cardClass, inputClass, PageIntro } from "./ui";
 
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
 
@@ -46,34 +47,68 @@ function LocalContextNote() {
 function SubmitRow() {
   const { t, asking } = useCivica();
   return (
-    <div className="flex flex-wrap items-center gap-4">
-      <button
-        type="submit"
-        disabled={asking}
-        className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink hover:opacity-90 disabled:opacity-60"
-      >
-        {asking ? t.submitting : t.submit}
-      </button>
-      {asking && (
-        <p role="status" className="flex items-center gap-2 text-sm text-muted">
-          <span className="inline-block size-3 animate-pulse rounded-full bg-accent" aria-hidden />
-          {t.loadingNote}
-        </p>
-      )}
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-4">
+        <Button type="submit" disabled={asking}>
+          {asking ? (
+            <>
+              {t.submitting} <Dots />
+            </>
+          ) : (
+            <>
+              {t.submit}
+              <span aria-hidden>→</span>
+            </>
+          )}
+        </Button>
+      </div>
+      <Collapse show={asking}>
+        <div role="status" className="space-y-2 pt-1">
+          <ProgressBar />
+          <p className="text-sm text-muted">{t.loadingNote}</p>
+        </div>
+      </Collapse>
     </div>
   );
 }
 
-function ErrorMessage({ message }: { message: string | null }) {
-  if (!message) return null;
+export function ErrorMessage({ message }: { message: string | null }) {
   return (
-    <p role="alert" className="rounded-lg bg-error-soft px-3 py-2 text-sm text-error-ink">
-      {message}
-    </p>
+    <Collapse show={Boolean(message)}>
+      <p role="alert" className="rounded-xl border border-error-ink/15 bg-error-soft px-3 py-2 text-sm text-error-ink">
+        {message}
+      </p>
+    </Collapse>
   );
 }
 
-const formClass = "space-y-5 rounded-2xl border border-line bg-surface p-5 shadow-sm sm:p-6";
+function Features() {
+  const { t } = useCivica();
+  const icons = [
+    <path key="a" d="M4 6h16M4 12h10M4 18h7" strokeLinecap="round" />,
+    <path key="b" d="M12 4v16M5 8l-2 6h4l-2-6zm14 0l-2 6h4l-2-6zM5 8h14" strokeLinecap="round" strokeLinejoin="round" />,
+    <path key="c" d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" strokeLinecap="round" />,
+  ];
+  return (
+    <Stagger as="ul" className="grid gap-3 sm:grid-cols-3">
+      {t.features.map((feature, i) => (
+        <StaggerItem as="li" key={feature.title} className="flex gap-3 rounded-2xl border border-line/70 bg-surface/60 p-4">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
+            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+              {icons[i]}
+            </svg>
+          </span>
+          <span>
+            <span className="block font-semibold">{feature.title}</span>
+            <span className="block text-sm text-muted">{feature.body}</span>
+          </span>
+        </StaggerItem>
+      ))}
+    </Stagger>
+  );
+}
+
+const formClass = `${cardClass} space-y-5`;
 
 export function QuestionForm() {
   const { t, asking, askError } = useCivica();
@@ -84,6 +119,7 @@ export function QuestionForm() {
   return (
     <div className="space-y-6">
       <PageIntro title={t.navAsk} intro={t.intro} />
+      <Reveal delay={0.05}>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -110,15 +146,9 @@ export function QuestionForm() {
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted">{t.examplesLabel}:</span>
             {t.examples.map((example) => (
-              <button
-                key={example}
-                type="button"
-                disabled={asking}
-                onClick={() => setQuestion(example)}
-                className="rounded-full border border-line px-3 py-1 text-left hover:border-accent hover:text-accent disabled:opacity-60"
-              >
+              <Button key={example} variant="chip" type="button" disabled={asking} onClick={() => setQuestion(example)}>
                 {example}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -126,6 +156,8 @@ export function QuestionForm() {
         <ErrorMessage message={localError ?? (askError?.fromDocument === false ? askError.message : null)} />
         <SubmitRow />
       </form>
+      </Reveal>
+      <Features />
     </div>
   );
 }
@@ -156,6 +188,7 @@ export function DocumentForm() {
   return (
     <div className="space-y-6">
       <PageIntro title={t.navDocument} intro={t.documentIntro} />
+      <Reveal delay={0.05}>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -184,15 +217,15 @@ export function DocumentForm() {
             />
             <label
               htmlFor="file"
-              className="cursor-pointer rounded-lg bg-accent-soft px-3 py-2 font-medium text-accent peer-focus-visible:outline-2 peer-focus-visible:outline-accent peer-disabled:cursor-default peer-disabled:opacity-60"
+              className="cursor-pointer rounded-xl bg-accent-soft px-3 py-2 font-medium text-accent transition-transform hover:-translate-y-0.5 active:translate-y-0 active:scale-95 peer-focus-visible:outline-2 peer-focus-visible:outline-accent peer-disabled:cursor-default peer-disabled:opacity-60"
             >
               {t.chooseFile}
             </label>
             <span className="min-w-0 break-all text-muted">{file ? file.name : t.noFileChosen}</span>
             {file && (
-              <button type="button" onClick={clearFile} disabled={asking} className="text-accent underline">
+              <Button variant="ghost" type="button" onClick={clearFile} disabled={asking} className="text-accent underline">
                 {t.removeFile}
-              </button>
+              </Button>
             )}
           </div>
           <p className="text-sm text-muted">{t.fileHint}</p>
@@ -215,6 +248,7 @@ export function DocumentForm() {
         <ErrorMessage message={localError ?? (askError?.fromDocument ? askError.message : null)} />
         <SubmitRow />
       </form>
+      </Reveal>
     </div>
   );
 }

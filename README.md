@@ -39,6 +39,8 @@ META_AI_API_KEY=your-meta-key
 # CIVICA_MODEL=muse-wonder-1.0   (default)
 ```
 
+Civica also switches to Meta mode on its own when `ANTHROPIC_BASE_URL` points at `https://api.meta.ai` (the Claude Code setup Meta documents). In that case it reads the key from `ANTHROPIC_AUTH_TOKEN` and the model from `ANTHROPIC_MODEL`.
+
 In Meta mode Civica sends a plain Messages request to `https://api.meta.ai`: the key goes in an `Authorization: Bearer` header, and the Claude-only settings (server-side fallback, effort) are left out. Web search stays on, because source checking depends on it. If Meta rejects the `web_search` tool, set `CIVICA_WEB_SEARCH=off`. Answers still work, but no source can be verified, so every fact shows as unsourced.
 
 Quick check that your key and model work:
@@ -80,6 +82,7 @@ Follow-up chat           ──────►  /api/followup   ─────�
 | `src/app/*/page.tsx` | One page per menu item: Ask (`/`), Explain a document, My representatives, Your briefing (with its own section tabs), About |
 | `src/components/CivicaProvider.tsx` | State shared across pages: language, your state, the current briefing and follow-up chat |
 | `src/components/` | The menu (`SiteShell.tsx`), forms, and briefing sections |
+| `src/components/motion.tsx` | Shared animations ([motion.dev](https://motion.dev)): buttons, reveals, page transitions. They respect the visitor's "reduce motion" setting |
 | `src/app/api/*/route.ts` | The three server endpoints |
 | `src/lib/claude.ts` | Talks to Claude or Meta AI (`CIVICA_PROVIDER`); handles retries and errors |
 | `src/lib/prompts.ts` | Civica's instructions to Claude (neutrality, accuracy, safety) |

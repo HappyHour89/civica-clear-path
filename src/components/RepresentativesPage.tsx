@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { US_STATES } from "@/lib/states";
 import { useCivica } from "./CivicaProvider";
+import { ErrorMessage } from "./AskForm";
+import { Button, Dots, Reveal } from "./motion";
 import { Officials } from "./Officials";
-import { inputClass, PageIntro } from "./ui";
+import { cardClass, inputClass, PageIntro } from "./ui";
 
 export function RepresentativesPage() {
   const { t, state, setState, officials, lookUpOfficials, officialsLoading } = useCivica();
@@ -15,6 +17,7 @@ export function RepresentativesPage() {
   return (
     <div className="space-y-6">
       <PageIntro title={t.navRepresentatives} intro={t.repsIntro} />
+      <Reveal delay={0.05}>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -22,7 +25,7 @@ export function RepresentativesPage() {
           setLocalError(null);
           void lookUpOfficials(state, address.trim());
         }}
-        className="space-y-5 rounded-2xl border border-line bg-surface p-5 shadow-sm sm:p-6"
+        className={`${cardClass} space-y-5`}
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
@@ -62,25 +65,26 @@ export function RepresentativesPage() {
             <p className="text-sm text-muted">{t.addressHint}</p>
           </div>
         </div>
-        {localError && (
-          <p role="alert" className="rounded-lg bg-error-soft px-3 py-2 text-sm text-error-ink">
-            {localError}
-          </p>
-        )}
-        <button
-          type="submit"
-          disabled={officialsLoading}
-          className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink hover:opacity-90 disabled:opacity-60"
-        >
-          {officialsLoading ? t.findingReps : t.findReps}
-        </button>
+        <ErrorMessage message={localError} />
+        <Button type="submit" disabled={officialsLoading}>
+          {officialsLoading ? (
+            <>
+              {t.findingReps} <Dots />
+            </>
+          ) : (
+            t.findReps
+          )}
+        </Button>
       </form>
+      </Reveal>
 
       {showing && (
-        <section className="space-y-3 rounded-2xl border border-line bg-surface p-5 shadow-sm sm:p-6">
-          <h2 className="text-lg font-semibold">{t.yourOfficials}</h2>
-          <Officials officials={showing.officials} error={showing.error} t={t} />
-        </section>
+        <Reveal key={`${showing.state}-${showing.officials?.district ?? ""}`}>
+          <section className={`${cardClass} space-y-3`}>
+            <h2 className="text-lg font-semibold">{t.yourOfficials}</h2>
+            <Officials officials={showing.officials} error={showing.error} t={t} />
+          </section>
+        </Reveal>
       )}
     </div>
   );

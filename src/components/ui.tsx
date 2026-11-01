@@ -1,12 +1,13 @@
 import Link from "next/link";
 import type { Dictionary } from "@/lib/i18n";
 import type { Source } from "@/lib/schemas";
+import { Stagger, StaggerItem } from "./motion";
 
 export function Section(props: { title: string; children: React.ReactNode; note?: string }) {
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="text-lg font-semibold">{props.title}</h2>
+        <h2 className="text-lg font-semibold tracking-tight">{props.title}</h2>
         {props.note && <p className="text-sm text-muted">{props.note}</p>}
       </div>
       {props.children}
@@ -16,11 +17,13 @@ export function Section(props: { title: string; children: React.ReactNode; note?
 
 export function BulletList({ items }: { items: string[] }) {
   return (
-    <ul className="list-disc space-y-1.5 pl-5 leading-relaxed marker:text-accent">
+    <Stagger as="ul" className="list-disc space-y-1.5 pl-5 leading-relaxed marker:text-accent">
       {items.map((item, i) => (
-        <li key={i}>{item}</li>
+        <StaggerItem as="li" key={i}>
+          {item}
+        </StaggerItem>
       ))}
-    </ul>
+    </Stagger>
   );
 }
 
@@ -97,12 +100,18 @@ export function SourceList(props: { sources: Source[]; scope: string; t: Diction
 }
 
 export const inputClass =
-  "w-full rounded-lg border border-line bg-surface px-3 py-2 text-ink placeholder:text-muted/70 disabled:opacity-60";
+  "w-full rounded-xl border border-line bg-surface px-3 py-2 text-ink shadow-[inset_0_1px_2px_rgb(0_0_0/0.04)] transition-[border-color,box-shadow] placeholder:text-muted/70 focus:border-accent focus:shadow-[0_0_0_4px_var(--accent-soft)] focus:outline-none disabled:opacity-60";
+
+export const cardClass =
+  "rounded-3xl border border-line/80 bg-surface p-5 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_-16px_rgb(0_0_0/0.12)] sm:p-7";
 
 export function PageIntro(props: { title: string; intro?: string }) {
   return (
-    <div className="space-y-2">
-      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{props.title}</h1>
+    <div className="space-y-3">
+      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+        {props.title}
+        <span className="mt-3 block h-1 w-12 rounded-full bg-accent" aria-hidden />
+      </h1>
       {props.intro && <p className="max-w-2xl text-lg leading-relaxed text-muted">{props.intro}</p>}
     </div>
   );

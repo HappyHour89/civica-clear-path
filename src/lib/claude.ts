@@ -16,38 +16,51 @@ export class CivicaError extends Error {
 }
 
 // Civica can run on Claude (default) or on Meta AI's Anthropic-compatible
-// Messages API. Set CIVICA_PROVIDER=meta and META_AI_API_KEY to use Meta.
+// Messages API. Meta mode is used when CIVICA_PROVIDER=meta, or when
+// ANTHROPIC_BASE_URL points at api.meta.ai (the Claude Code setup Meta
+// documents), so the same environment variables work for both.
 type Provider = {
   name: "anthropic" | "meta";
   model: string;
-  keyVar: string;
+  key: string | undefined;
+  // Settings that hold the key, named in the error when none is set.
+  keyVars: string;
   // Anthropic-only request features: the server-side fallback beta and effort.
   anthropicExtras: boolean;
   webSearch: boolean;
   createClient: () => Anthropic;
 };
 
+function pointsAtMeta(url: string | undefined) {
+  try {
+    return url ? new URL(url).hostname.endsWith("meta.ai") : false;
+  } catch {
+    return false;
+  }
+}
+
 export function getProvider(env: NodeJS.ProcessEnv = process.env): Provider {
   const webSearch = env.CIVICA_WEB_SEARCH !== "off";
-  if (env.CIVICA_PROVIDER === "meta") {
+  if (env.CIVICA_PROVIDER === "meta" || pointsAtMeta(env.ANTHROPIC_BASE_URL)) {
+    const key = env.META_AI_API_KEY || env.ANTHROPIC_AUTH_TOKEN || env.MODEL_API_KEY;
+    const baseURL =
+      env.META_AI_BASE_URL || (pointsAtMeta(env.ANTHROPIC_BASE_URL) ? env.ANTHROPIC_BASE_URL : undefined);
     return {
       name: "meta",
-      model: env.CIVICA_MODEL || "muse-wonder-1.0",
-      keyVar: "META_AI_API_KEY",
+      model: env.CIVICA_MODEL || env.ANTHROPIC_MODEL || "muse-wonder-1.0",
+      key,
+      keyVars: "META_AI_API_KEY (or ANTHROPIC_AUTH_TOKEN)",
       anthropicExtras: false,
       webSearch,
       createClient: () =>
-        new Anthropic({
-          baseURL: env.META_AI_BASE_URL || "https://api.meta.ai",
-          apiKey: null,
-          authToken: env.META_AI_API_KEY,
-        }),
+        new Anthropic({ baseURL: baseURL || "https://api.meta.ai", apiKey: null, authToken: key }),
     };
   }
   return {
     name: "anthropic",
     model: env.CIVICA_MODEL || "claude-opus-5-5",
-    keyVar: "ANTHROPIC_API_KEY",
+    key: env.ANTHROPIC_API_KEY,
+    keyVars: "ANTHROPIC_API_KEY",
     anthropicExtras: true,
     webSearch,
     createClient: () => new Anthropic(),
@@ -57,8 +70,8 @@ export function getProvider(env: NodeJS.ProcessEnv = process.env): Provider {
 let cached: { name: Provider["name"]; client: Anthropic } | null = null;
 
 function getClient(provider: Provider) {
-  if (!process.env[provider.keyVar]) {
-    throw new CivicaError(`The server is missing its ${provider.keyVar} setting.`, 500);
+  if (!provider.key) {
+    throw new CivicaError(`The server is missing its ${provider.keyVars} setting.`, 500);
   }
   if (cached?.name !== provider.name) cached = { name: provider.name, client: provider.createClient() };
   return cached.client;

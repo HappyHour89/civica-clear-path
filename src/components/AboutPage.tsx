@@ -1,18 +1,21 @@
 "use client";
 
 import { useCivica } from "./CivicaProvider";
-import { PageIntro } from "./ui";
+import { Stagger, StaggerItem } from "./motion";
+import { cardClass, PageIntro } from "./ui";
 
 export function AboutPage() {
   const { t } = useCivica();
   return (
     <div className="space-y-6">
       <PageIntro title={t.aboutTitle} />
-      <div className="max-w-2xl space-y-4 rounded-2xl border border-line bg-surface p-5 leading-relaxed shadow-sm sm:p-7">
+      <Stagger className={`${cardClass} max-w-2xl space-y-4 leading-relaxed`}>
         {t.aboutParagraphs.map((paragraph) => (
-          <p key={paragraph}>{paragraph}</p>
+          <StaggerItem key={paragraph}>
+            <p>{paragraph}</p>
+          </StaggerItem>
         ))}
-      </div>
+      </Stagger>
     </div>
   );
 }

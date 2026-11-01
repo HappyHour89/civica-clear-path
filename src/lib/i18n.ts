@@ -114,6 +114,11 @@ const en = {
   briefingReady: "New",
   nothingHere: "Nothing to show in this section for this topic.",
   noOfficialsYet: "Set your state to see your members of Congress here.",
+  features: [
+    { title: "Plain language", body: "What it does and why it matters, without jargon." },
+    { title: "Every side", body: "The main viewpoints side by side. Civica never picks one." },
+    { title: "Real sources", body: "Each key fact links to a source retrieved for your question." },
+  ],
   aboutTitle: "About Civica",
   aboutParagraphs: [
     "Civica explains political and legal questions in plain language. It shows what a policy or law actually does, why it matters, and the main viewpoints side by side. It never tells you what to think.",
@@ -229,6 +234,11 @@ const ko: Dictionary = {
   briefingReady: "새 브리핑",
   nothingHere: "이 주제에 대해 이 항목에 표시할 내용이 없습니다.",
   noOfficialsYet: "거주 주를 설정하면 여기에 내 지역 연방 의원이 표시됩니다.",
+  features: [
+    { title: "쉬운 말", body: "무엇을 하는지, 왜 중요한지 어려운 용어 없이 설명합니다." },
+    { title: "모든 관점", body: "주요 관점을 나란히 보여 줍니다. Civica는 어느 편도 들지 않습니다." },
+    { title: "실제 출처", body: "핵심 사실마다 질문을 위해 검색된 출처가 연결됩니다." },
+  ],
   aboutTitle: "Civica 소개",
   aboutParagraphs: [
     "Civica는 정치·법률 질문을 쉬운 말로 설명합니다. 정책이나 법이 실제로 무엇을 하는지, 왜 중요한지, 그리고 주요 관점을 나란히 보여 줍니다. 무엇을 생각해야 하는지는 절대 말하지 않습니다.",

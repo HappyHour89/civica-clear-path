@@ -3,7 +3,10 @@ import { checkRateLimit, clientKey } from "./rateLimit";
 
 export function errorResponse(error: unknown) {
   if (error instanceof CivicaError) {
-    return Response.json({ error: error.message }, { status: error.status });
+    return Response.json(
+      error.detail ? { error: error.message, detail: error.detail } : { error: error.message },
+      { status: error.status },
+    );
   }
   console.error("Unhandled server error", error);
   return Response.json({ error: "Something went wrong. Please try again." }, { status: 500 });

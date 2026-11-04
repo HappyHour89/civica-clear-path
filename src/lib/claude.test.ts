@@ -1,8 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { Messages } from "@anthropic-ai/sdk/resources/beta/messages/messages";
+import { Messages as StandardMessages } from "@anthropic-ai/sdk/resources/messages/messages";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as askRoute } from "../app/api/ask/route";
-import { CivicaError, research, resetProviderStateForTests } from "./claude";
+import { CivicaError, parseJsonAnswer, research, resetProviderStateForTests } from "./claude";
 import { BriefingSchema, FollowUpSchema } from "./schemas";
 import { sampleBriefing } from "./testFixtures";
 
@@ -145,6 +146,80 @@ describe("research", () => {
       delete process.env.CIVICA_PROVIDER;
       delete process.env.META_AI_API_KEY;
     }
+  });
+
+  it("falls back to a no-tools JSON answer when Meta rejects tool requests", async () => {
+    process.env.CIVICA_PROVIDER = "meta";
+    process.env.META_AI_API_KEY = "meta-key";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const toolSpy = vi.spyOn(Messages.prototype, "create");
+      toolSpy.mockRejectedValue(new Anthropic.BadRequestError(400, undefined, "tools not supported", new Headers()));
+      const textSpy = vi.spyOn(StandardMessages.prototype, "create").mockResolvedValue({
+        stop_reason: "end_turn",
+        content: [{ type: "text", text: "```json\n" + JSON.stringify(followUp) + "\n```" }],
+      } as never);
+      const options = {
+        messages: [{ role: "user" as const, content: "q" }],
+        toolName: "submit_answer",
+        toolDescription: "d",
+        schema: FollowUpSchema,
+        maxSearches: 3,
+      };
+      const { data, searchedUrls } = await research(options);
+      expect(data).toEqual(followUp);
+      expect(searchedUrls.size).toBe(0);
+      expect(toolSpy).toHaveBeenCalledTimes(2);
+      const params = textSpy.mock.calls[0][0] as unknown as Record<string, unknown>;
+      expect(params).not.toHaveProperty("tools");
+      expect(params.system).toContain("JSON Schema");
+
+      // Later requests go straight to the JSON form.
+      await research(options);
+      expect(toolSpy).toHaveBeenCalledTimes(2);
+      expect(textSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      delete process.env.CIVICA_PROVIDER;
+      delete process.env.META_AI_API_KEY;
+    }
+  });
+
+  it("passes the provider's reason along when every form is rejected", async () => {
+    process.env.CIVICA_PROVIDER = "meta";
+    process.env.META_AI_API_KEY = "meta-key";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const body = { type: "error", error: { type: "invalid_request_error", message: "model: unknown model" } };
+    try {
+      vi.spyOn(Messages.prototype, "create").mockRejectedValue(
+        new Anthropic.BadRequestError(400, body, "400 raw", new Headers()),
+      );
+      vi.spyOn(StandardMessages.prototype, "create").mockRejectedValue(
+        new Anthropic.BadRequestError(400, body, "400 raw", new Headers()),
+      );
+      const error = await research({
+        messages: [{ role: "user", content: "q" }],
+        toolName: "t",
+        toolDescription: "d",
+        schema: FollowUpSchema,
+        maxSearches: 1,
+      }).catch((e) => e);
+      expect(error).toBeInstanceOf(CivicaError);
+      expect(error.status).toBe(400);
+      expect(error.detail).toBe("model: unknown model");
+    } finally {
+      delete process.env.CIVICA_PROVIDER;
+      delete process.env.META_AI_API_KEY;
+    }
+  });
+
+  it("parses JSON answers wrapped in prose and reports schema problems", () => {
+    expect(parseJsonAnswer(`Sure! ${JSON.stringify(followUp)} Hope that helps.`, FollowUpSchema)).toEqual({
+      ok: true,
+      data: followUp,
+    });
+    const bad = parseJsonAnswer('{"answer": 5}', FollowUpSchema);
+    expect(bad.ok).toBe(false);
+    expect(parseJsonAnswer("no json here", FollowUpSchema)).toEqual({ ok: false, error: "no JSON object found" });
   });
 
   it("does not retry Claude after a 400", async () => {
@@ -315,6 +390,17 @@ describe("POST /api/ask", () => {
     expect(prompt).toContain("Korean");
     expect(prompt).toContain("California (CA)");
     expect(prompt).toContain("<user_question>\nWhat is the filibuster?\n</user_question>");
+  });
+
+  it("includes the AI provider's reason in error responses", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const body = { type: "error", error: { type: "invalid_request_error", message: "max_tokens too large" } };
+    vi.spyOn(Messages.prototype, "create").mockRejectedValueOnce(
+      new Anthropic.BadRequestError(400, body, "400 raw", new Headers()),
+    );
+    const response = await askRoute(askRequest({ question: "q", language: "en" }, "10.0.0.9"));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ detail: "max_tokens too large" });
   });
 
   it("requires a question or a file", async () => {

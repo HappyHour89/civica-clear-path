@@ -10,6 +10,9 @@ export class CivicaError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    // The AI provider's own explanation, shown to the user so a rejected
+    // request can be diagnosed without server logs.
+    readonly detail?: string,
   ) {
     super(message);
   }
@@ -77,18 +80,67 @@ function getClient(provider: Provider) {
   return cached.client;
 }
 
-export async function research<T>(options: {
+type ResearchOptions<T> = {
   messages: Anthropic.Beta.BetaMessageParam[];
   toolName: string;
   toolDescription: string;
   schema: z.ZodType<T>;
   maxSearches: number;
-}): Promise<{ data: T; searchedUrls: Set<string> }> {
+};
+
+type ResearchResult<T> = { data: T; searchedUrls: Set<string> };
+
+// Meta's endpoint may not support every Claude feature, so a rejected request
+// steps down to a simpler form: first without web search, strict tools or
+// prompt caching, then with no tools at all (the answer comes back as JSON
+// text). The accepted form is remembered for later requests.
+type Level = "full" | "basic-tools" | "json-text";
+const META_LEVELS: Level[] = ["full", "basic-tools", "json-text"];
+let metaLevel = 0;
+
+export function resetProviderStateForTests() {
+  metaLevel = 0;
+  cached = null;
+}
+
+export async function research<T>(options: ResearchOptions<T>): Promise<ResearchResult<T>> {
+  const provider = getProvider();
+  const client = getClient(provider);
+  if (provider.name !== "meta") {
+    try {
+      return await researchWithTools(client, provider, options, "full");
+    } catch (error) {
+      throw toCivicaError(error);
+    }
+  }
+  for (;;) {
+    const index = metaLevel;
+    const level = META_LEVELS[index];
+    try {
+      return level === "json-text"
+        ? await researchWithJson(client, provider, options)
+        : await researchWithTools(client, provider, options, level);
+    } catch (error) {
+      if (!(error instanceof Anthropic.BadRequestError) || index === META_LEVELS.length - 1) {
+        throw toCivicaError(error);
+      }
+      console.error(`Meta AI rejected the "${level}" request; trying a simpler one.`, providerMessage(error));
+      metaLevel = Math.max(metaLevel, index + 1);
+    }
+  }
+}
+
+async function researchWithTools<T>(
+  client: Anthropic,
+  provider: Provider,
+  options: ResearchOptions<T>,
+  level: Exclude<Level, "json-text">,
+): Promise<ResearchResult<T>> {
   const messages = [...options.messages];
   const searchedUrls = new Set<string>();
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const response = await callClaude({ ...options, messages });
+    const response = await client.beta.messages.create(buildRequest(provider, { ...options, messages }, level));
     collectSearchResultUrls(response.content, searchedUrls);
 
     if (response.stop_reason === "refusal") {
@@ -126,66 +178,94 @@ export async function research<T>(options: {
   throw new CivicaError("Research took too many steps. Please try again.", 504);
 }
 
-type CallOptions = {
-  messages: Anthropic.Beta.BetaMessageParam[];
-  toolName: string;
-  toolDescription: string;
-  schema: z.ZodType;
-  maxSearches: number;
-};
+// The most compatible form: a plain Messages request with no tools, asking
+// for the answer as a JSON object in the reply text. No web search happens,
+// so no source can be verified.
+async function researchWithJson<T>(
+  client: Anthropic,
+  provider: Provider,
+  options: ResearchOptions<T>,
+): Promise<ResearchResult<T>> {
+  const system = [
+    SYSTEM_PROMPT,
+    // Overrides the prompt's search and tool instructions, which don't apply here.
+    "For this answer you have no web search and no tool to call. Answer from what you know, flag anything that may be out of date as uncertain, and leave any list of sources or phone numbers empty: never cite pages or numbers you have not retrieved.",
+    `Instead of calling a tool, reply with only a JSON object, with no other text and no code fences, that matches this JSON Schema:\n${JSON.stringify(toolInputSchema(options.schema))}`,
+  ].join("\n\n");
+  const messages = [...options.messages] as Anthropic.MessageParam[];
 
-async function callClaude(options: CallOptions) {
-  const provider = getProvider();
-  const client = getClient(provider);
-  // Meta's endpoint may not support every Claude feature. Once a full request
-  // has been rejected, later requests go straight to the minimal form.
-  const minimal = provider.name === "meta" && metaNeedsMinimal;
-  try {
-    return await client.beta.messages.create(buildRequest(provider, options, minimal));
-  } catch (error) {
-    if (provider.name !== "meta" || minimal || !(error instanceof Anthropic.BadRequestError)) {
-      throw toCivicaError(error);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await client.messages.create({
+      model: provider.model,
+      max_tokens: 8192,
+      system,
+      messages,
+    });
+    if (response.stop_reason === "refusal") {
+      throw new CivicaError("This request couldn't be answered. Try rephrasing your question.", 422);
     }
-    console.error(
-      "Meta AI rejected the full request; retrying without web search, strict tools, or prompt caching.",
-      error.message,
+    const text = response.content
+      .flatMap((block) => (block.type === "text" ? [block.text] : []))
+      .join("");
+    const problem = parseJsonAnswer(text, options.schema);
+    if (problem.ok) return { data: problem.data, searchedUrls: new Set() };
+    console.error("Meta AI returned an unusable JSON answer", problem.error);
+    if (response.stop_reason === "max_tokens") {
+      throw new CivicaError("The answer was too long to finish. Try a narrower question.", 502);
+    }
+    messages.push(
+      { role: "assistant", content: text || "(empty reply)" },
+      {
+        role: "user",
+        content: `That reply could not be used (${problem.error}). Reply again with only the corrected JSON object.`,
+      },
     );
-    try {
-      const response = await client.beta.messages.create(buildRequest(provider, options, true));
-      metaNeedsMinimal = true;
-      return response;
-    } catch (retryError) {
-      throw toCivicaError(retryError);
-    }
   }
+  throw new CivicaError("The answer came back in an unexpected format. Please try again.", 502);
 }
 
-let metaNeedsMinimal = false;
-
-export function resetProviderStateForTests() {
-  metaNeedsMinimal = false;
-  cached = null;
+export function parseJsonAnswer<T>(
+  text: string,
+  schema: z.ZodType<T>,
+): { ok: true; data: T } | { ok: false; error: string } {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end <= start) return { ok: false, error: "no JSON object found" };
+  let value: unknown;
+  try {
+    value = JSON.parse(text.slice(start, end + 1));
+  } catch (e) {
+    return { ok: false, error: `invalid JSON: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.slice(0, 5).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`);
+    return { ok: false, error: `does not match the schema: ${issues.join("; ")}` };
+  }
+  return { ok: true, data: parsed.data };
 }
 
 function buildRequest(
   provider: Provider,
-  options: CallOptions,
-  minimal: boolean,
+  options: ResearchOptions<unknown>,
+  level: Exclude<Level, "json-text">,
 ): Anthropic.Beta.MessageCreateParamsNonStreaming {
+  const full = level === "full";
   const tools: Anthropic.Beta.BetaToolUnion[] = [
     {
       name: options.toolName,
       description: options.toolDescription,
-      ...(!minimal && { strict: true }),
+      ...(full && { strict: true }),
       input_schema: toolInputSchema(options.schema),
     },
   ];
-  if (provider.webSearch && !minimal) {
+  if (provider.webSearch && full) {
     tools.unshift({ type: "web_search_20260209", name: "web_search", max_uses: options.maxSearches });
   }
   return {
     model: provider.model,
-    max_tokens: 16000,
+    // Some compatible APIs cap output lower than Claude does.
+    max_tokens: full ? 16000 : 8192,
     ...(provider.anthropicExtras && {
       // If a safety classifier declines, the API retries on its recommended
       // fallback model inside the same call instead of failing outright.
@@ -193,34 +273,43 @@ function buildRequest(
       fallbacks: "default",
       output_config: { effort: "medium" },
     }),
-    system: minimal
-      ? SYSTEM_PROMPT
-      : [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+    system: full ? [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }] : SYSTEM_PROMPT,
     tools,
     tool_choice: { type: "auto" },
     messages: options.messages,
   };
 }
 
+// The provider's own error text, e.g. "max_tokens: must be at most 8192".
+function providerMessage(error: InstanceType<typeof Anthropic.APIError>) {
+  const body = error.error as { error?: { message?: unknown }; message?: unknown } | undefined;
+  const message = body?.error?.message ?? body?.message ?? error.message;
+  return String(message).slice(0, 300);
+}
+
 function toCivicaError(error: unknown): CivicaError {
   if (error instanceof CivicaError) return error;
   if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
     console.error("AI provider credentials rejected", error.message);
-    return new CivicaError("The server's AI credentials are invalid.", 500);
+    return new CivicaError("The server's AI credentials were rejected.", 500, providerMessage(error));
   }
   if (error instanceof Anthropic.RateLimitError) {
     return new CivicaError("Civica is busy right now. Please wait a minute and try again.", 429);
   }
   if (error instanceof Anthropic.BadRequestError) {
     console.error("AI provider rejected the request", error.message);
-    return new CivicaError("The AI service couldn't process this request. Please try again or rephrase it.", 400);
+    return new CivicaError(
+      "The AI service couldn't process this request. Please try again or rephrase it.",
+      400,
+      providerMessage(error),
+    );
   }
   if (error instanceof Anthropic.APIConnectionError) {
     return new CivicaError("Couldn't reach the AI service. Please try again.", 503);
   }
   if (error instanceof Anthropic.APIError) {
     console.error("AI provider API error", error.status, error.message);
-    return new CivicaError("The AI service had a problem. Please try again.", 502);
+    return new CivicaError("The AI service had a problem. Please try again.", 502, providerMessage(error));
   }
   console.error("Unexpected error calling Claude", error);
   return new CivicaError("Something went wrong. Please try again.", 500);

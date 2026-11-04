@@ -5,11 +5,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Civica — Understand politics. Think for yourself.",
+    default: "Civica — Know what it says. Decide what you think.",
     template: "%s · Civica",
   },
   description:
-    "Plain-language, nonpartisan explanations of political and legal issues, with competing perspectives and sources.",
+    "Civica turns bills, ballot measures, court letters, and political news into plain language. Key facts link to their sources, and the main viewpoints sit side by side. In English and Korean.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

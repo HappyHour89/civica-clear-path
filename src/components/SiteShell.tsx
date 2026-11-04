@@ -38,7 +38,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const { t, language, setLanguage, result, asking } = useCivica();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const items = navItems(t);
+  // "Your briefing" appears once there is one, or one is being researched.
+  const items = navItems(t).filter((item) => item.href !== "/briefing" || asking || result);
 
   const links = (layoutGroup: string, onNavigate?: () => void) => (
     <LayoutGroup id={layoutGroup}>

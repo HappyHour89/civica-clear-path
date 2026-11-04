@@ -12,10 +12,7 @@ async function readJson<T>(response: Response, t: Dictionary, language: Language
   if (response.status === 413) throw new Error(t.errorTooLarge);
   if (response.status === 415) throw new Error(t.errorFileType);
   const serverMessage = body && typeof body.error === "string" ? body.error : null;
-  const message = language === "en" && serverMessage ? serverMessage : t.genericError;
-  // The AI provider's own reason, so a rejected request can be diagnosed.
-  const detail = body && typeof body.detail === "string" ? body.detail : null;
-  throw new Error(detail ? `${message} ${t.aiServiceDetails}: ${detail}` : message);
+  throw new Error(language === "en" && serverMessage ? serverMessage : t.genericError);
 }
 
 export async function askQuestion(

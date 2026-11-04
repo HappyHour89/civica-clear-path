@@ -10,9 +10,9 @@ export function isLanguage(value: unknown): value is Language {
 }
 
 const en = {
-  tagline: "Understand politics. Think for yourself.",
+  tagline: "Know what it says. Decide what you think.",
   intro:
-    "Ask about a law, policy, court case, institution, or political event. Civica explains it in plain language, shows the main viewpoints side by side, and links to sources — it never tells you what to think.",
+    "Ask about any law, court case, policy, or political fight. You'll get a plain-language explanation, the strongest case each side makes, and sources for the key facts.",
   questionLabel: "Your question",
   questionPlaceholder: "e.g. What does the filibuster do, and why do people argue about it?",
   fileLabel: "Or upload a document (optional)",
@@ -37,7 +37,6 @@ const en = {
   ],
   needQuestionOrFile: "Type a question or upload a file.",
   genericError: "Something went wrong. Please try again.",
-  aiServiceDetails: "Details from the AI service",
   errorBusy: "You've reached the limit for now, or Civica is busy. Please wait a few minutes and try again.",
   errorTooLarge: "That file or conversation is too large. Try a smaller file or start a new question.",
   errorFileType: "Unsupported file. Upload a PDF, an image, or a plain-text file.",
@@ -88,7 +87,7 @@ const en = {
   navBriefing: "Your briefing",
   navAbout: "About",
   documentIntro:
-    "Upload a bill, ballot measure, court letter, or news article. Civica explains what it is, what it does, and what it could mean for you.",
+    "Got a bill, ballot measure, court letter, or article you can't decode? Upload it. Civica tells you what it is, what it actually does, and what it could mean for you.",
   documentFileLabel: "Document",
   documentQuestionLabel: "What do you want to know about it? (optional)",
   documentQuestionPlaceholder: "e.g. How would this affect renters?",
@@ -98,7 +97,7 @@ const en = {
   addStateHint: "Want your members of Congress and local contacts in the answer?",
   setYourState: "Set your state",
   repsIntro:
-    "Find your U.S. senators and House representative. Your state is also used to add local contacts to the answers you get.",
+    "See who represents you in Congress and how to reach them. Names and phone numbers come from the public congress-legislators dataset, not from AI. Your state is also used for local contacts in your answers.",
   findReps: "Find my representatives",
   findingReps: "Looking up…",
   needState: "Choose your state.",
@@ -122,19 +121,19 @@ const en = {
   ],
   aboutTitle: "About Civica",
   aboutParagraphs: [
-    "Civica explains political and legal questions in plain language. It shows what a policy or law actually does, why it matters, and the main viewpoints side by side. It never tells you what to think.",
-    "Every key fact links to a source that was actually retrieved while researching your question. Facts that couldn't be tied to a source are clearly labeled.",
-    "Your members of Congress come from the public congress-legislators dataset, not from the AI, so names and office phone numbers are reliable.",
-    "Nothing you type or upload is stored. Civica is an educational tool, not legal advice — AI can make mistakes, so check the sources.",
+    "Civica exists because the documents that shape your life — bills, ballot measures, court notices — are written for lawyers, not for you.",
+    "Ask a question or upload a document, and Civica explains it in plain language: what it is, what it does, and why people disagree about it. Every major viewpoint gets its strongest version, side by side. Civica never tells you what to conclude.",
+    "Key facts link to sources retrieved while answering your question. Anything that couldn't be tied to a source is labeled.",
+    "Civica doesn't save your questions, files, or address. Your state and language are remembered only in your own browser. Civica is an educational tool, not legal advice. AI can make mistakes, so check the sources.",
   ],
 };
 
 export type Dictionary = typeof en;
 
 const ko: Dictionary = {
-  tagline: "정치를 이해하고, 스스로 생각하세요.",
+  tagline: "무슨 내용인지 알고, 판단은 스스로.",
   intro:
-    "법률, 정책, 재판, 기관, 정치적 사건에 대해 질문하세요. Civica는 쉬운 말로 설명하고, 주요 관점을 나란히 보여 주며, 출처를 연결합니다. 무엇을 생각해야 하는지는 절대 말하지 않습니다.",
+    "법률, 재판, 정책, 정치적 논쟁 등 무엇이든 질문하세요. 쉬운 말로 된 설명과 각 입장의 가장 강력한 논거, 그리고 핵심 사실의 출처를 보여 드립니다.",
   questionLabel: "질문",
   questionPlaceholder: "예: 필리버스터는 무엇이고, 왜 논쟁이 되나요?",
   fileLabel: "또는 문서 업로드 (선택)",
@@ -159,7 +158,6 @@ const ko: Dictionary = {
   ],
   needQuestionOrFile: "질문을 입력하거나 파일을 업로드하세요.",
   genericError: "문제가 발생했습니다. 다시 시도해 주세요.",
-  aiServiceDetails: "AI 서비스 응답",
   errorBusy: "이용 한도에 도달했거나 서비스가 혼잡합니다. 몇 분 후 다시 시도해 주세요.",
   errorTooLarge: "파일이나 대화가 너무 큽니다. 더 작은 파일을 사용하거나 새로 질문해 주세요.",
   errorFileType: "지원하지 않는 파일입니다. PDF, 이미지, 텍스트 파일을 업로드하세요.",
@@ -210,7 +208,7 @@ const ko: Dictionary = {
   navBriefing: "내 브리핑",
   navAbout: "소개",
   documentIntro:
-    "법안, 주민투표 안건, 법원 서신, 뉴스 기사를 업로드하세요. Civica가 문서의 성격과 내용, 그리고 나에게 어떤 의미인지 설명합니다.",
+    "이해하기 어려운 법안, 주민투표 안건, 법원 서신, 기사가 있나요? 업로드하세요. Civica가 무엇인지, 실제로 무엇을 하는지, 나에게 어떤 의미인지 알려 드립니다.",
   documentFileLabel: "문서",
   documentQuestionLabel: "무엇이 궁금한가요? (선택)",
   documentQuestionPlaceholder: "예: 세입자에게 어떤 영향이 있나요?",
@@ -219,7 +217,7 @@ const ko: Dictionary = {
   changeState: "변경",
   addStateHint: "답변에 내 지역 연방 의원과 지역 연락처를 포함할까요?",
   setYourState: "거주 주 설정",
-  repsIntro: "내 지역 연방 상원의원과 하원의원을 찾아보세요. 거주 주는 답변에 지역 연락처를 추가하는 데도 사용됩니다.",
+  repsIntro: "연방 의회에서 나를 대표하는 의원과 연락 방법을 확인하세요. 이름과 전화번호는 AI가 아닌 공개 congress-legislators 데이터셋에서 가져옵니다. 거주 주는 답변의 지역 연락처에도 사용됩니다.",
   findReps: "내 지역 의원 찾기",
   findingReps: "조회 중…",
   needState: "거주 주를 선택하세요.",
@@ -243,10 +241,10 @@ const ko: Dictionary = {
   ],
   aboutTitle: "Civica 소개",
   aboutParagraphs: [
-    "Civica는 정치·법률 질문을 쉬운 말로 설명합니다. 정책이나 법이 실제로 무엇을 하는지, 왜 중요한지, 그리고 주요 관점을 나란히 보여 줍니다. 무엇을 생각해야 하는지는 절대 말하지 않습니다.",
-    "모든 핵심 사실은 질문을 조사하는 동안 실제로 검색된 출처와 연결됩니다. 출처를 확인하지 못한 사실은 분명히 표시됩니다.",
-    "연방 의원 정보는 AI가 아닌 공개 congress-legislators 데이터셋에서 가져오므로 이름과 사무실 전화번호를 신뢰할 수 있습니다.",
-    "입력하거나 업로드한 내용은 저장되지 않습니다. Civica는 교육용 도구이며 법률 자문이 아닙니다. AI는 실수할 수 있으니 출처를 확인하세요.",
+    "법안, 주민투표 안건, 법원 통지서처럼 우리 삶을 좌우하는 문서는 일반인이 아니라 법률가를 위해 쓰여 있습니다. Civica는 그래서 만들어졌습니다.",
+    "질문하거나 문서를 업로드하면 Civica가 쉬운 말로 설명합니다. 무엇인지, 무엇을 하는지, 사람들이 왜 의견이 다른지. 주요 관점마다 가장 강력한 논거를 나란히 보여 주며, 어떤 결론을 내려야 하는지는 절대 말하지 않습니다.",
+    "핵심 사실은 질문에 답하는 동안 실제로 검색된 출처와 연결됩니다. 출처를 확인하지 못한 내용은 따로 표시됩니다.",
+    "Civica는 질문, 파일, 주소를 저장하지 않습니다. 거주 주와 언어 설정은 사용자의 브라우저에만 저장됩니다. Civica는 교육용 도구이며 법률 자문이 아닙니다. AI는 실수할 수 있으니 출처를 확인하세요.",
   ],
 };
 

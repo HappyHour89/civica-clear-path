@@ -5,14 +5,14 @@ import { collectSearchResultUrls } from "./sources";
 import { toolInputSchema } from "./schemas";
 
 const MAX_ROUNDS = 5;
+// Per API call. A full answer with web search usually takes 60–90 seconds;
+// the routes allow 300 seconds in total.
+const REQUEST_TIMEOUT_MS = 180_000;
 
 export class CivicaError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    // The AI provider's own explanation, shown to the user so a rejected
-    // request can be diagnosed without server logs.
-    readonly detail?: string,
   ) {
     super(message);
   }
@@ -56,7 +56,7 @@ export function getProvider(env: NodeJS.ProcessEnv = process.env): Provider {
       anthropicExtras: false,
       webSearch,
       createClient: () =>
-        new Anthropic({ baseURL: baseURL || "https://api.meta.ai", apiKey: null, authToken: key }),
+        new Anthropic({ baseURL: baseURL || "https://api.meta.ai", apiKey: null, authToken: key, timeout: REQUEST_TIMEOUT_MS }),
     };
   }
   return {
@@ -66,7 +66,7 @@ export function getProvider(env: NodeJS.ProcessEnv = process.env): Provider {
     keyVars: "ANTHROPIC_API_KEY",
     anthropicExtras: true,
     webSearch,
-    createClient: () => new Anthropic(),
+    createClient: () => new Anthropic({ timeout: REQUEST_TIMEOUT_MS }),
   };
 }
 
@@ -260,7 +260,9 @@ function buildRequest(
     },
   ];
   if (provider.webSearch && full) {
-    tools.unshift({ type: "web_search_20260209", name: "web_search", max_uses: options.maxSearches });
+    // The plain search tool: the 20260209 version expects a code-execution
+    // tool alongside it, and without one its searches fail and burn max_uses.
+    tools.unshift({ type: "web_search_20250305", name: "web_search", max_uses: options.maxSearches });
   }
   return {
     model: provider.model,
@@ -290,26 +292,30 @@ function providerMessage(error: InstanceType<typeof Anthropic.APIError>) {
 function toCivicaError(error: unknown): CivicaError {
   if (error instanceof CivicaError) return error;
   if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
-    console.error("AI provider credentials rejected", error.message);
-    return new CivicaError("The server's AI credentials were rejected.", 500, providerMessage(error));
+    console.error("AI provider credentials rejected", providerMessage(error));
+    return new CivicaError("Civica's AI service isn't set up correctly. Please try again later.", 500);
   }
   if (error instanceof Anthropic.RateLimitError) {
     return new CivicaError("Civica is busy right now. Please wait a minute and try again.", 429);
   }
   if (error instanceof Anthropic.BadRequestError) {
-    console.error("AI provider rejected the request", error.message);
-    return new CivicaError(
-      "The AI service couldn't process this request. Please try again or rephrase it.",
-      400,
-      providerMessage(error),
-    );
+    // Logged in full for the operator; users only see a friendly message.
+    const reason = providerMessage(error);
+    console.error("AI provider rejected the request", reason);
+    if (/credit balance|billing|quota/i.test(reason)) {
+      return new CivicaError("Civica's AI service is temporarily unavailable. Please try again later.", 503);
+    }
+    return new CivicaError("The AI service couldn't process this request. Please try again or rephrase it.", 400);
+  }
+  if (error instanceof Anthropic.APIConnectionTimeoutError) {
+    return new CivicaError("The AI service took too long to answer. Please try again.", 504);
   }
   if (error instanceof Anthropic.APIConnectionError) {
     return new CivicaError("Couldn't reach the AI service. Please try again.", 503);
   }
   if (error instanceof Anthropic.APIError) {
-    console.error("AI provider API error", error.status, error.message);
-    return new CivicaError("The AI service had a problem. Please try again.", 502, providerMessage(error));
+    console.error("AI provider API error", error.status, providerMessage(error));
+    return new CivicaError("The AI service had a problem. Please try again.", 502);
   }
   console.error("Unexpected error calling Claude", error);
   return new CivicaError("Something went wrong. Please try again.", 500);

@@ -184,7 +184,7 @@ describe("research", () => {
     }
   });
 
-  it("passes the provider's reason along when every form is rejected", async () => {
+  it("keeps the provider's reason out of the user-facing error", async () => {
     process.env.CIVICA_PROVIDER = "meta";
     process.env.META_AI_API_KEY = "meta-key";
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -205,7 +205,7 @@ describe("research", () => {
       }).catch((e) => e);
       expect(error).toBeInstanceOf(CivicaError);
       expect(error.status).toBe(400);
-      expect(error.detail).toBe("model: unknown model");
+      expect(error.message).not.toContain("unknown model");
     } finally {
       delete process.env.CIVICA_PROVIDER;
       delete process.env.META_AI_API_KEY;
@@ -220,6 +220,17 @@ describe("research", () => {
     const bad = parseJsonAnswer('{"answer": 5}', FollowUpSchema);
     expect(bad.ok).toBe(false);
     expect(parseJsonAnswer("no json here", FollowUpSchema)).toEqual({ ok: false, error: "no JSON object found" });
+  });
+
+  it("turns a billing rejection into a friendly 503", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const body = { type: "error", error: { type: "invalid_request_error", message: "Your credit balance is too low" } };
+    vi.spyOn(Messages.prototype, "create").mockRejectedValueOnce(
+      new Anthropic.BadRequestError(400, body, "400 raw", new Headers()),
+    );
+    const error = await research({ messages: [], toolName: "t", toolDescription: "d", schema: FollowUpSchema, maxSearches: 1 }).catch((e) => e);
+    expect(error.status).toBe(503);
+    expect(error.message).not.toMatch(/credit/i);
   });
 
   it("does not retry Claude after a 400", async () => {
@@ -392,7 +403,7 @@ describe("POST /api/ask", () => {
     expect(prompt).toContain("<user_question>\nWhat is the filibuster?\n</user_question>");
   });
 
-  it("includes the AI provider's reason in error responses", async () => {
+  it("does not expose the AI provider's reason in error responses", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const body = { type: "error", error: { type: "invalid_request_error", message: "max_tokens too large" } };
     vi.spyOn(Messages.prototype, "create").mockRejectedValueOnce(
@@ -400,7 +411,7 @@ describe("POST /api/ask", () => {
     );
     const response = await askRoute(askRequest({ question: "q", language: "en" }, "10.0.0.9"));
     expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ detail: "max_tokens too large" });
+    expect(JSON.stringify(await response.json())).not.toContain("max_tokens");
   });
 
   it("requires a question or a file", async () => {

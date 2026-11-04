@@ -1,6 +1,6 @@
 # Civica
 
-**Understand politics. Think for yourself.**
+**Know what it says. Decide what you think.**
 
 Civica explains political and legal questions in plain language. For each question (or uploaded document) it shows:
 
@@ -112,7 +112,7 @@ Each question makes one or more Claude requests with up to six web searches. Exp
 ## Privacy and safety
 
 - The API key only exists on the server.
-- Questions, files, and addresses are never stored. Files are capped at 4 MB and checked by their actual contents, not their name.
+- Questions, files, and addresses are never stored on the server; only the chosen state and language are remembered, in the visitor's own browser. Files are capped at 4 MB and checked by their actual contents, not their name.
 - Instructions hidden in uploaded documents are treated as content to explain, not commands.
 - Links shown to users must be `http`/`https`, and the AI's text is never inserted as raw HTML.
 - Each visitor is limited to 8 new questions and 30 follow-ups per 10 minutes. This limit lives in server memory, so on Vercel it is per server instance and is not a hard guarantee. Your Anthropic spend limit is the real safety net.

@@ -8,9 +8,9 @@ const FIND_REP_URL = "https://www.house.gov/representatives/find-your-representa
 
 function OfficialCard({ official, label, t }: { official: FederalOfficial; label: string; t: Dictionary }) {
   return (
-    <StaggerItem className="space-y-1 rounded-2xl border border-line bg-canvas/40 p-4 transition-[border-color,transform] hover:-translate-y-0.5 hover:border-accent/50">
+    <StaggerItem className="space-y-1 rounded-lg border border-line bg-surface p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
-      <p className="font-semibold">{official.name}</p>
+      <p className="font-serif text-lg font-semibold">{official.name}</p>
       <p className="text-sm text-muted">
         {official.party}
         {official.chamber === "house" &&

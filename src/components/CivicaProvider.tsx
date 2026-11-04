@@ -9,7 +9,7 @@ import { isStateCode } from "@/lib/states";
 
 export type AskInput = { question: string; file: File | null };
 
-export type BriefingResult = { question: string; state: string; briefing: Briefing };
+export type BriefingResult = { question: string; state: string; briefing: Briefing; fromDocument: boolean };
 
 export type OfficialsState = { state: string; officials: OfficialsResult | null; error: boolean };
 
@@ -116,7 +116,7 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
           askQuestion({ question: input.question, file: input.file, language, state }, t),
           officialsRequest,
         ]);
-        setResult({ question: input.question, state, briefing });
+        setResult({ question: input.question, state, briefing, fromDocument: input.file !== null });
         setTurns([]);
         return true;
       } catch (e) {

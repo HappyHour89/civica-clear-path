@@ -4,7 +4,7 @@ import { useState } from "react";
 import { US_STATES } from "@/lib/states";
 import { useCivica } from "./CivicaProvider";
 import { ErrorMessage } from "./AskForm";
-import { Button, Dots, Reveal } from "./motion";
+import { Button, Reveal } from "./motion";
 import { Officials } from "./Officials";
 import { cardClass, inputClass, PageIntro } from "./ui";
 
@@ -15,7 +15,7 @@ export function RepresentativesPage() {
   const showing = officials && officials.state === state ? officials : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       <PageIntro title={t.navRepresentatives} intro={t.repsIntro} />
       <Reveal delay={0.05}>
       <form
@@ -67,21 +67,15 @@ export function RepresentativesPage() {
         </div>
         <ErrorMessage message={localError} />
         <Button type="submit" disabled={officialsLoading}>
-          {officialsLoading ? (
-            <>
-              {t.findingReps} <Dots />
-            </>
-          ) : (
-            t.findReps
-          )}
+          {officialsLoading ? t.findingReps : t.findReps}
         </Button>
       </form>
       </Reveal>
 
       {showing && (
         <Reveal key={`${showing.state}-${showing.officials?.district ?? ""}`}>
-          <section className={`${cardClass} space-y-3`}>
-            <h2 className="text-lg font-semibold">{t.yourOfficials}</h2>
+          <section className="space-y-4">
+            <h2 className="font-serif text-2xl font-semibold">{t.yourOfficials}</h2>
             <Officials officials={showing.officials} error={showing.error} t={t} />
           </section>
         </Reveal>

@@ -9,16 +9,17 @@ import { AnimatePresence, motion, type HTMLMotionProps } from "motion/react";
 export const spring = { type: "spring", stiffness: 420, damping: 30 } as const;
 export const softSpring = { type: "spring", stiffness: 260, damping: 28 } as const;
 
-const press = { whileHover: { y: -1.5 }, whileTap: { y: 0, scale: 0.97 }, transition: spring };
+// A small press on click; no hover lift, which reads as "startup".
+const press = { whileTap: { scale: 0.98 }, transition: spring };
 
 type ButtonProps = HTMLMotionProps<"button"> & { variant?: "primary" | "soft" | "chip" | "ghost" };
 
 const variants = {
   primary:
-    "inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-2.5 font-semibold text-accent-ink shadow-[0_6px_20px_-8px_var(--accent)] hover:shadow-[0_10px_28px_-10px_var(--accent)] disabled:opacity-60 disabled:shadow-none",
-  soft: "inline-flex items-center gap-2 rounded-xl bg-accent-soft px-3 py-2 font-medium text-accent disabled:opacity-60",
-  chip: "rounded-full border border-line bg-surface px-3 py-1 text-left text-sm hover:border-accent hover:text-accent disabled:opacity-60",
-  ghost: "rounded-lg px-3 py-1.5 text-sm font-medium text-muted hover:text-ink",
+    "inline-flex h-10 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:opacity-60",
+  soft: "inline-flex h-9 items-center gap-2 rounded-md border border-line bg-surface px-3 text-sm font-medium text-ink transition-colors hover:border-ink disabled:opacity-60",
+  chip: "rounded-md border border-line bg-surface px-2.5 py-1 text-left text-sm text-ink transition-colors hover:border-accent hover:text-accent disabled:opacity-60",
+  ghost: "rounded-md px-2 py-1 text-sm font-medium text-muted transition-colors hover:text-ink",
 };
 
 export function Button({ variant = "primary", className = "", disabled, ...props }: ButtonProps) {
@@ -91,22 +92,6 @@ export function Collapse({ show, children }: { show: boolean; children: React.Re
         </motion.div>
       )}
     </AnimatePresence>
-  );
-}
-
-// Three bouncing dots for "working on it".
-export function Dots() {
-  return (
-    <span className="inline-flex items-center gap-1" aria-hidden>
-      {[0, 1, 2].map((i) => (
-        <motion.span
-          key={i}
-          className="inline-block size-1.5 rounded-full bg-current"
-          animate={{ y: [0, -4, 0], opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15, ease: "easeInOut" }}
-        />
-      ))}
-    </span>
   );
 }
 

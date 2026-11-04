@@ -6,7 +6,7 @@ import type { Dictionary, Language } from "@/lib/i18n";
 import type { Briefing } from "@/lib/schemas";
 import { AnimatePresence, motion } from "motion/react";
 import { useCivica } from "./CivicaProvider";
-import { Button, Collapse, Dots, softSpring } from "./motion";
+import { Button, Collapse, softSpring } from "./motion";
 import { CitedText, inputClass, SourceList } from "./ui";
 
 export function FollowUpChat(props: {
@@ -71,7 +71,7 @@ export function FollowUpChat(props: {
                 initial={{ opacity: 0, y: 12, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={softSpring}
-                className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-accent px-4 py-2 text-accent-ink"
+                className="ml-auto w-fit max-w-[85%] rounded-lg bg-accent-soft px-4 py-2 text-ink"
               >
                 <span className="sr-only">{t.you}: </span>
                 {turn.content}
@@ -83,7 +83,7 @@ export function FollowUpChat(props: {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={softSpring}
-                className="space-y-3 rounded-2xl rounded-bl-md border border-line bg-canvas/40 px-4 py-3"
+                className="space-y-3 border-l-2 border-line py-1 pl-4"
               >
                 <CitedText
                   text={turn.content}
@@ -115,11 +115,11 @@ export function FollowUpChat(props: {
 
       <Collapse show={loading}>
         <p role="status" className="flex items-center gap-2 text-sm text-muted">
-          <Dots /> {t.submitting}
+          {t.submitting}
         </p>
       </Collapse>
       <Collapse show={Boolean(error)}>
-        <p role="alert" className="rounded-xl border border-error-ink/15 bg-error-soft px-3 py-2 text-sm text-error-ink">
+        <p role="alert" className="rounded-r-md border-l-2 border-error-ink bg-error-soft px-3 py-2 text-sm text-error-ink">
           {error}
         </p>
       </Collapse>

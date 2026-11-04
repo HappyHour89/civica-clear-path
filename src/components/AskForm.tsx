@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { US_STATES } from "@/lib/states";
 import { useCivica, type AskInput } from "./CivicaProvider";
-import { Button, Collapse, Dots, ProgressBar, Reveal, Stagger, StaggerItem } from "./motion";
+import { Button, Collapse, ProgressBar, Reveal, Stagger, StaggerItem } from "./motion";
 import { cardClass, inputClass, PageIntro } from "./ui";
 
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
@@ -44,28 +44,39 @@ function LocalContextNote() {
   );
 }
 
+// Seconds since `active` became true, so a long wait shows honest progress
+// (time passing) rather than invented stages.
+function useElapsed(active: boolean) {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const start = Date.now();
+    const timer = setInterval(() => setSeconds(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => {
+      clearInterval(timer);
+      setSeconds(0);
+    };
+  }, [active]);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 function SubmitRow() {
   const { t, asking } = useCivica();
+  const elapsed = useElapsed(asking);
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-4">
-        <Button type="submit" disabled={asking}>
-          {asking ? (
-            <>
-              {t.submitting} <Dots />
-            </>
-          ) : (
-            <>
-              {t.submit}
-              <span aria-hidden>→</span>
-            </>
-          )}
-        </Button>
-      </div>
+      <Button type="submit" disabled={asking}>
+        {asking ? t.submitting : t.submit}
+      </Button>
       <Collapse show={asking}>
         <div role="status" className="space-y-2 pt-1">
           <ProgressBar />
-          <p className="text-sm text-muted">{t.loadingNote}</p>
+          <p className="flex justify-between gap-4 text-sm text-muted">
+            <span>{t.loadingNote}</span>
+            <span className="tabular-nums" aria-hidden>
+              {elapsed}
+            </span>
+          </p>
         </div>
       </Collapse>
     </div>
@@ -75,33 +86,23 @@ function SubmitRow() {
 export function ErrorMessage({ message }: { message: string | null }) {
   return (
     <Collapse show={Boolean(message)}>
-      <p role="alert" className="rounded-xl border border-error-ink/15 bg-error-soft px-3 py-2 text-sm text-error-ink">
+      <p role="alert" className="rounded-r-md border-l-2 border-error-ink bg-error-soft px-3 py-2 text-sm text-error-ink">
         {message}
       </p>
     </Collapse>
   );
 }
 
+// Three numbered promises, set like a newspaper's column row.
 function Features() {
   const { t } = useCivica();
-  const icons = [
-    <path key="a" d="M4 6h16M4 12h10M4 18h7" strokeLinecap="round" />,
-    <path key="b" d="M12 4v16M5 8l-2 6h4l-2-6zm14 0l-2 6h4l-2-6zM5 8h14" strokeLinecap="round" strokeLinejoin="round" />,
-    <path key="c" d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" strokeLinecap="round" />,
-  ];
   return (
-    <Stagger as="ul" className="grid gap-3 sm:grid-cols-3">
+    <Stagger as="ol" className="grid gap-6 border-t border-line pt-8 sm:grid-cols-3 sm:gap-0 sm:divide-x sm:divide-line">
       {t.features.map((feature, i) => (
-        <StaggerItem as="li" key={feature.title} className="flex gap-3 rounded-2xl border border-line/70 bg-surface/60 p-4">
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
-            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-              {icons[i]}
-            </svg>
-          </span>
-          <span>
-            <span className="block font-semibold">{feature.title}</span>
-            <span className="block text-sm text-muted">{feature.body}</span>
-          </span>
+        <StaggerItem as="li" key={feature.title} className="space-y-1 sm:px-6 sm:first:pl-0 sm:last:pr-0">
+          <span className="font-serif text-sm font-semibold text-accent">0{i + 1}</span>
+          <span className="block font-serif text-xl font-semibold">{feature.title}</span>
+          <span className="block text-sm text-muted">{feature.body}</span>
         </StaggerItem>
       ))}
     </Stagger>
@@ -117,7 +118,7 @@ export function QuestionForm() {
   const [localError, setLocalError] = useState<string | null>(null);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       <PageIntro title={t.navAsk} intro={t.intro} />
       <Reveal delay={0.05}>
       <form
@@ -186,7 +187,7 @@ export function DocumentForm() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       <PageIntro title={t.navDocument} intro={t.documentIntro} />
       <Reveal delay={0.05}>
       <form
@@ -217,7 +218,7 @@ export function DocumentForm() {
             />
             <label
               htmlFor="file"
-              className="cursor-pointer rounded-xl bg-accent-soft px-3 py-2 font-medium text-accent transition-transform hover:-translate-y-0.5 active:translate-y-0 active:scale-95 peer-focus-visible:outline-2 peer-focus-visible:outline-accent peer-disabled:cursor-default peer-disabled:opacity-60"
+              className="cursor-pointer rounded-md border border-line bg-surface px-3 py-1.5 font-medium text-ink transition-colors hover:border-ink active:scale-[0.98] peer-focus-visible:outline-2 peer-focus-visible:outline-accent peer-disabled:cursor-default peer-disabled:opacity-60"
             >
               {t.chooseFile}
             </label>

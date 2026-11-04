@@ -22,18 +22,8 @@ export function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-// A balanced pair of columns: civic, and deliberately not party-coded.
-function LogoMark() {
-  return (
-    <span className="grid size-9 place-items-center rounded-xl bg-accent text-accent-ink shadow-[0_6px_18px_-8px_var(--accent)]">
-      <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-        <path d="M3 9.5 12 4l9 5.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M6 10.5v7M10 10.5v7M14 10.5v7M18 10.5v7M4 20h16" strokeLinecap="round" />
-      </svg>
-    </span>
-  );
-}
-
+// A newspaper-style masthead: a brand rule, a serif wordmark, and plain-text
+// navigation with a sliding underline.
 export function SiteShell({ children }: { children: React.ReactNode }) {
   const { t, language, setLanguage, result, asking } = useCivica();
   const pathname = usePathname();
@@ -41,35 +31,39 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   // "Your briefing" appears once there is one, or one is being researched.
   const items = navItems(t).filter((item) => item.href !== "/briefing" || asking || result);
 
-  const links = (layoutGroup: string, onNavigate?: () => void) => (
+  const links = (layoutGroup: string, vertical: boolean, onNavigate?: () => void) => (
     <LayoutGroup id={layoutGroup}>
       {items.map((item) => {
         const active = isActive(pathname, item.href);
-        const showBadge = item.href === "/briefing" && (asking || result) && !active;
+        const showBadge = item.href === "/briefing" && asking && !active;
         return (
           <Link
             key={item.href}
             href={item.href}
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
-            className={`relative flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              active ? "text-accent" : "text-muted hover:text-ink"
-            }`}
+            className={`relative flex items-center gap-1.5 py-2.5 text-sm font-medium transition-colors ${
+              vertical ? "px-1" : "px-3"
+            } ${active ? "text-ink" : "text-muted hover:text-ink"}`}
           >
-            {active && (
-              <motion.span
-                layoutId="nav-pill"
-                className="absolute inset-0 -z-10 rounded-lg bg-accent-soft"
-                transition={spring}
-              />
-            )}
             {item.label}
             {showBadge && (
               <motion.span
-                className="inline-block size-2 rounded-full bg-accent"
-                animate={asking ? { scale: [1, 1.5, 1], opacity: [1, 0.5, 1] } : { scale: 1 }}
-                transition={asking ? { duration: 1.2, repeat: Infinity } : spring}
+                className="inline-block size-1.5 rounded-full bg-accent"
+                animate={{ opacity: [1, 0.3, 1] }}
+                transition={{ duration: 1.2, repeat: Infinity }}
                 aria-hidden
+              />
+            )}
+            {active && (
+              <motion.span
+                layoutId="nav-underline"
+                className={
+                  vertical
+                    ? "absolute inset-y-2 -left-3 w-0.5 bg-accent"
+                    : "absolute inset-x-3 -bottom-px h-0.5 bg-accent"
+                }
+                transition={spring}
               />
             )}
           </Link>
@@ -81,43 +75,36 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   return (
     <MotionConfig reducedMotion="user">
       <div className="flex flex-1 flex-col">
-        <header className="sticky top-0 z-20 border-b border-line/70 bg-surface/80 backdrop-blur-md">
-          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-            <Link href="/" className="group flex items-center gap-3 text-left">
-              <motion.span whileHover={{ rotate: -6, scale: 1.05 }} transition={spring}>
-                <LogoMark />
-              </motion.span>
-              <span>
-                <span className="block text-xl font-bold tracking-tight">Civica</span>
-                <span className="block text-xs text-muted">{t.tagline}</span>
-              </span>
+        <header className="sticky top-0 z-20 border-t-4 border-b border-t-accent border-b-line bg-canvas/95 backdrop-blur">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 pt-4 pb-2 sm:px-6">
+            <Link href="/" className="text-left">
+              <span className="block font-serif text-3xl font-semibold leading-none tracking-tight">Civica</span>
+              <span className="mt-1.5 block text-sm text-muted">{t.tagline}</span>
             </Link>
-            <div className="flex items-center gap-2">
-              <div role="group" aria-label="Language" className="relative isolate flex rounded-full border border-line bg-surface p-1">
-                {(Object.keys(LANGUAGES) as Language[]).map((code) => (
-                  <button
-                    key={code}
-                    type="button"
-                    onClick={() => setLanguage(code)}
-                    aria-pressed={language === code}
-                    className={`relative rounded-full px-3 py-1 text-sm transition-colors ${
-                      language === code ? "text-accent-ink" : "text-muted hover:text-ink"
-                    }`}
-                  >
-                    {language === code && (
-                      <motion.span layoutId="lang-pill" className="absolute inset-0 -z-10 rounded-full bg-accent" transition={spring} />
-                    )}
-                    {LANGUAGES[code].label}
-                  </button>
+            <div className="flex items-center gap-3">
+              <div role="group" aria-label="Language" className="flex items-center gap-1 text-sm">
+                {(Object.keys(LANGUAGES) as Language[]).map((code, i) => (
+                  <span key={code} className="flex items-center gap-1">
+                    {i > 0 && <span className="text-line" aria-hidden>|</span>}
+                    <button
+                      type="button"
+                      onClick={() => setLanguage(code)}
+                      aria-pressed={language === code}
+                      className={`rounded-sm px-1.5 py-1 transition-colors ${
+                        language === code ? "font-semibold text-ink underline decoration-accent decoration-2 underline-offset-4" : "text-muted hover:text-ink"
+                      }`}
+                    >
+                      {LANGUAGES[code].label}
+                    </button>
+                  </span>
                 ))}
               </div>
-              <motion.button
+              <button
                 type="button"
                 onClick={() => setMenuOpen((open) => !open)}
                 aria-expanded={menuOpen}
                 aria-controls="mobile-menu"
-                whileTap={{ scale: 0.95 }}
-                className="flex items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm font-medium md:hidden"
+                className="flex items-center gap-2 rounded-md border border-line px-2.5 py-1.5 text-sm font-medium md:hidden"
               >
                 <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                   <motion.path animate={menuOpen ? { d: "M5 5l10 10" } : { d: "M3 6h14" }} transition={spring} strokeLinecap="round" />
@@ -125,11 +112,11 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                   <motion.path animate={menuOpen ? { d: "M5 15L15 5" } : { d: "M3 14h14" }} transition={spring} strokeLinecap="round" />
                 </svg>
                 {t.menu}
-              </motion.button>
+              </button>
             </div>
           </div>
-          <nav aria-label={t.mainMenu} className="isolate mx-auto hidden max-w-5xl gap-1 px-4 pb-2 sm:px-6 md:flex">
-            {links("desktop-nav")}
+          <nav aria-label={t.mainMenu} className="mx-auto hidden max-w-5xl px-1 sm:px-3 md:flex">
+            {links("desktop-nav", false)}
           </nav>
           <AnimatePresence initial={false}>
             {menuOpen && (
@@ -140,18 +127,21 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={softSpring}
-                className="isolate flex flex-col gap-1 overflow-hidden px-4 md:hidden"
+                className="overflow-hidden border-t border-line px-7 md:hidden"
               >
-                <div className="flex flex-col gap-1 pb-3">{links("mobile-nav", () => setMenuOpen(false))}</div>
+                <div className="flex flex-col py-2">{links("mobile-nav", true, () => setMenuOpen(false))}</div>
               </motion.nav>
             )}
           </AnimatePresence>
         </header>
 
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-10">{children}</main>
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 sm:py-14">{children}</main>
 
-        <footer className="border-t border-line px-4 py-6 text-center text-xs text-muted sm:px-6">
-          {t.disclaimer}
+        <footer className="border-t border-line">
+          <div className="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-8 text-xs text-muted sm:flex-row sm:justify-between sm:px-6">
+            <span className="font-serif text-sm font-semibold text-ink">Civica</span>
+            <span className="max-w-xl sm:text-right">{t.disclaimer}</span>
+          </div>
         </footer>
       </div>
     </MotionConfig>

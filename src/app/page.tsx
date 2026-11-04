@@ -1,5 +1,5 @@
-import { CivicaApp } from "@/components/CivicaApp";
+import { QuestionForm } from "@/components/AskForm";
 
-export default function Home() {
-  return <CivicaApp />;
+export default function AskPage() {
+  return <QuestionForm />;
 }

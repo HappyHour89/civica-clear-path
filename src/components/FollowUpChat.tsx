@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { askFollowUp, type ChatTurn } from "@/lib/client";
+import { askFollowUp } from "@/lib/client";
 import type { Dictionary, Language } from "@/lib/i18n";
 import type { Briefing } from "@/lib/schemas";
-import { CitedText, SourceList } from "./ui";
+import { AnimatePresence, motion } from "motion/react";
+import { useCivica } from "./CivicaProvider";
+import { Button, Collapse, softSpring } from "./motion";
+import { CitedText, inputClass, SourceList } from "./ui";
 
 export function FollowUpChat(props: {
   t: Dictionary;
@@ -14,7 +17,8 @@ export function FollowUpChat(props: {
   briefing: Briefing;
 }) {
   const { t } = props;
-  const [turns, setTurns] = useState<ChatTurn[]>([]);
+  // Kept in the provider so the conversation survives switching pages.
+  const { turns, setTurns } = useCivica();
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,14 +62,29 @@ export function FollowUpChat(props: {
     <div className="space-y-4">
       {turns.length > 0 && (
         <ol className="space-y-4">
+          <AnimatePresence initial={false}>
           {turns.map((turn, i) =>
             turn.role === "user" ? (
-              <li key={i} className="ml-auto max-w-[85%] rounded-2xl bg-accent-soft px-4 py-2">
+              <motion.li
+                key={i}
+                layout
+                initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={softSpring}
+                className="ml-auto w-fit max-w-[85%] rounded-lg bg-accent-soft px-4 py-2 text-ink"
+              >
                 <span className="sr-only">{t.you}: </span>
                 {turn.content}
-              </li>
+              </motion.li>
             ) : (
-              <li key={i} className="space-y-3 rounded-2xl border border-line px-4 py-3">
+              <motion.li
+                key={i}
+                layout
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={softSpring}
+                className="space-y-3 border-l-2 border-line py-1 pl-4"
+              >
                 <CitedText
                   text={turn.content}
                   scope={`fu${i}`}
@@ -77,39 +96,33 @@ export function FollowUpChat(props: {
                     <SourceList sources={turn.sources ?? []} scope={`fu${i}`} t={t} />
                   </div>
                 </details>
-              </li>
+              </motion.li>
             ),
           )}
+          </AnimatePresence>
         </ol>
       )}
 
       {turns.length === 0 && props.briefing.follow_up_suggestions.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {props.briefing.follow_up_suggestions.map((suggestion) => (
-            <button
-              key={suggestion}
-              type="button"
-              disabled={loading}
-              onClick={() => send(suggestion)}
-              className="rounded-full border border-line px-3 py-1 text-left text-sm hover:border-accent hover:text-accent disabled:opacity-60"
-            >
+            <Button key={suggestion} variant="chip" type="button" disabled={loading} onClick={() => send(suggestion)}>
               {suggestion}
-            </button>
+            </Button>
           ))}
         </div>
       )}
 
-      {loading && (
+      <Collapse show={loading}>
         <p role="status" className="flex items-center gap-2 text-sm text-muted">
-          <span className="inline-block size-3 animate-pulse rounded-full bg-accent" aria-hidden />
           {t.submitting}
         </p>
-      )}
-      {error && (
-        <p role="alert" className="rounded-lg bg-error-soft px-3 py-2 text-sm text-error-ink">
+      </Collapse>
+      <Collapse show={Boolean(error)}>
+        <p role="alert" className="rounded-r-md border-l-2 border-error-ink bg-error-soft px-3 py-2 text-sm text-error-ink">
           {error}
         </p>
-      )}
+      </Collapse>
 
       <form
         onSubmit={(e) => {
@@ -128,15 +141,11 @@ export function FollowUpChat(props: {
           placeholder={t.followUpPlaceholder}
           maxLength={2000}
           disabled={loading}
-          className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 placeholder:text-muted/70 disabled:opacity-60"
+          className={`${inputClass} min-w-0 flex-1`}
         />
-        <button
-          type="submit"
-          disabled={loading || !draft.trim()}
-          className="rounded-lg bg-accent px-4 py-2 font-semibold text-accent-ink hover:opacity-90 disabled:opacity-60"
-        >
+        <Button type="submit" disabled={loading || !draft.trim()} className="px-4 py-2">
           {t.send}
-        </button>
+        </Button>
       </form>
     </div>
   );

@@ -1,211 +1,384 @@
-import type { Dictionary, Language } from "@/lib/i18n";
-import type { OfficialsResult } from "@/lib/officials";
+"use client";
+
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+import type { Dictionary } from "@/lib/i18n";
 import type { Briefing } from "@/lib/schemas";
+import { useCivica } from "./CivicaProvider";
 import { FollowUpChat } from "./FollowUpChat";
+import { ProgressBar, softSpring, spring, Stagger, StaggerItem } from "./motion";
 import { Officials } from "./Officials";
-import { BulletList, CitationLink, ExternalLink, Section, SourceList } from "./ui";
+import {
+  BulletList,
+  cardClass,
+  citationClass,
+  ExternalLink,
+  Eyebrow,
+  Section,
+  sourceAnchor,
+  SourceList,
+  UnsourcedLabel,
+} from "./ui";
 
-const card = "space-y-8 rounded-2xl border border-line bg-surface p-5 shadow-sm sm:p-7";
+const SOURCES_PATH = "/briefing/sources";
 
-export function BriefingView(props: {
-  t: Dictionary;
-  language: Language;
-  question: string;
-  state: string;
-  briefing: Briefing;
-  officials: OfficialsResult | null;
-  officialsError: boolean;
-  onStartOver: () => void;
-}) {
-  const { t, briefing: b } = props;
+function tabs(t: Dictionary) {
+  return [
+    { href: "/briefing", label: t.tabOverview },
+    { href: "/briefing/perspectives", label: t.tabPerspectives },
+    { href: "/briefing/terms", label: t.tabTerms },
+    { href: "/briefing/contacts", label: t.tabContacts },
+    { href: SOURCES_PATH, label: t.tabSources },
+    { href: "/briefing/follow-up", label: t.tabFollowUp },
+  ];
+}
 
-  const startOver = (
-    <button type="button" onClick={props.onStartOver} className="text-sm text-accent underline underline-offset-2">
-      ← {t.startOver}
-    </button>
-  );
+function Empty({ text }: { text: string }) {
+  return <p className="text-muted">{text}</p>;
+}
 
+// Shared frame for every briefing page: headline plus the section index.
+// Shows an in-progress or empty state when there is no briefing yet.
+export function BriefingFrame({ children }: { children: React.ReactNode }) {
+  const { t, result, asking } = useCivica();
+  const pathname = usePathname();
+
+  if (!result) {
+    return (
+      <div className={`${cardClass} max-w-2xl space-y-4`}>
+        <h1 className="font-serif text-2xl font-semibold">{t.noBriefingTitle}</h1>
+        {asking ? (
+          <div role="status" className="space-y-3">
+            <ProgressBar />
+            <p className="text-muted">{t.briefingInProgress}</p>
+          </div>
+        ) : (
+          <p className="text-muted">
+            {t.noBriefingBody}{" "}
+            <Link href="/" className="text-accent underline underline-offset-2">
+              {t.navAsk}
+            </Link>{" "}
+            ·{" "}
+            <Link href="/document" className="text-accent underline underline-offset-2">
+              {t.navDocument}
+            </Link>
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const b = result.briefing;
   if (!b.in_scope) {
     return (
-      <div className="space-y-4">
-        {startOver}
-        <div className={card}>
-          <Section title={t.outOfScope}>
-            <p className="leading-relaxed">{b.out_of_scope_message}</p>
-          </Section>
-        </div>
+      <div className={`${cardClass} max-w-2xl space-y-3`}>
+        <h1 className="font-serif text-2xl font-semibold">{t.outOfScope}</h1>
+        <p>{b.out_of_scope_message}</p>
       </div>
     );
   }
 
   return (
-    <article className="space-y-6">
-      {startOver}
-
-      <div className={card}>
-        <header className="space-y-3">
-          {props.question && <p className="text-sm text-muted">“{props.question}”</p>}
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{b.title}</h1>
-        </header>
-        <Section title={t.summary}>
-          <p className="text-lg leading-relaxed">{b.summary}</p>
-        </Section>
-        <div className="grid gap-8 md:grid-cols-2">
-          {b.what_it_does.length > 0 && (
-            <Section title={t.whatItDoes}>
-              <BulletList items={b.what_it_does} />
-            </Section>
-          )}
-          {b.why_it_matters.length > 0 && (
-            <Section title={t.whyItMatters}>
-              <BulletList items={b.why_it_matters} />
-            </Section>
-          )}
-        </div>
-        {b.key_facts.length > 0 && (
-          <Section title={t.keyFacts}>
-            <ul className="list-disc space-y-1.5 pl-5 leading-relaxed marker:text-accent">
-              {b.key_facts.map((fact, i) => (
-                <li key={i}>
-                  {fact.fact}
-                  {fact.source_ids.length > 0 ? (
-                    fact.source_ids.map((id) => <CitationLink key={id} scope="b" id={id} />)
-                  ) : (
-                    <span className="ml-1.5 rounded bg-warn-soft px-1.5 py-0.5 text-xs text-warn-ink">
-                      {t.noSourceForFact}
-                    </span>
-                  )}
+    <article className="space-y-8">
+      <header className="space-y-3">
+        <Eyebrow>{result.fromDocument ? t.documentEyebrow : t.briefingEyebrow}</Eyebrow>
+        <motion.h1
+          key={b.title}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={softSpring}
+          className="max-w-3xl font-serif text-4xl font-semibold tracking-tight sm:text-5xl"
+        >
+          {b.title}
+        </motion.h1>
+        {result.question && <p className="max-w-2xl text-muted">“{result.question}”</p>}
+        {asking && (
+          <p role="status" className="text-sm text-muted">
+            {t.briefingInProgress}
+          </p>
+        )}
+      </header>
+      <nav aria-label={t.briefingSections} className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <LayoutGroup id="briefing-tabs">
+          <ul className="-ml-3 flex min-w-max border-b border-line">
+            {tabs(t).map((tab) => {
+              const active = pathname === tab.href;
+              return (
+                <li key={tab.href}>
+                  <Link
+                    href={tab.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`relative block px-3 py-2.5 text-sm font-medium transition-colors ${
+                      active ? "text-ink" : "text-muted hover:text-ink"
+                    }`}
+                  >
+                    {tab.label}
+                    {active && (
+                      <motion.span
+                        layoutId="tab-underline"
+                        className="absolute inset-x-3 -bottom-px h-0.5 bg-accent"
+                        transition={spring}
+                      />
+                    )}
+                  </Link>
                 </li>
-              ))}
-            </ul>
-          </Section>
-        )}
-      </div>
-
-      {b.perspectives.length > 0 && (
-        <div className={card}>
-          <Section title={t.perspectives} note={t.perspectivesNote}>
-            <div className="grid gap-4 md:grid-cols-2">
-              {b.perspectives.map((perspective, i) => (
-                <div key={i} className="space-y-3 rounded-xl border border-line p-4">
-                  <h3 className="font-semibold">{perspective.viewpoint}</h3>
-                  <p className="text-sm">
-                    <span className="font-medium text-muted">{t.coreValues}: </span>
-                    {perspective.core_values}
-                  </p>
-                  <BulletList items={perspective.main_arguments} />
-                </div>
-              ))}
-            </div>
-          </Section>
-          {b.common_ground.length > 0 && (
-            <Section title={t.commonGround}>
-              <BulletList items={b.common_ground} />
-            </Section>
-          )}
-          {b.questions_to_consider.length > 0 && (
-            <Section title={t.questionsToConsider}>
-              <BulletList items={b.questions_to_consider} />
-            </Section>
-          )}
-        </div>
-      )}
-
-      {b.key_terms.length > 0 && (
-        <div className={card}>
-          <Section title={t.keyTerms}>
-            <dl className="grid gap-4 sm:grid-cols-2">
-              {b.key_terms.map((term) => (
-                <div key={term.term}>
-                  <dt className="font-semibold">{term.term}</dt>
-                  <dd className="text-sm leading-relaxed text-muted">{term.definition}</dd>
-                </div>
-              ))}
-            </dl>
-          </Section>
-        </div>
-      )}
-
-      {(props.state || b.leaders.length > 0) && (
-        <div className={card}>
-          {props.state && (
-            <Section title={t.yourOfficials}>
-              <Officials officials={props.officials} error={props.officialsError} t={t} />
-            </Section>
-          )}
-          {b.leaders.length > 0 && (
-            <Section title={t.leaders}>
-              <ul className="space-y-2">
-                {b.leaders.map((leader, i) => (
-                  <li key={i}>
-                    <span className="font-semibold">{leader.name}</span>
-                    <span className="text-muted"> — {leader.role}</span>
-                    <p className="text-sm leading-relaxed">{leader.relevance}</p>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
-        </div>
-      )}
-
-      {(b.helpful_websites.length > 0 || b.phone_numbers.length > 0) && (
-        <div className={card}>
-          {b.helpful_websites.length > 0 && (
-            <Section title={t.websites}>
-              <ul className="space-y-2">
-                {b.helpful_websites.map((site) => (
-                  <li key={site.url}>
-                    <ExternalLink href={site.url}>{site.name}</ExternalLink>
-                    <p className="text-sm text-muted">{site.description}</p>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
-          {b.phone_numbers.length > 0 && (
-            <Section title={t.phoneNumbers} note={t.phoneWarning}>
-              <ul className="space-y-2">
-                {b.phone_numbers.map((entry, i) => (
-                  <li key={i}>
-                    <span className="font-semibold">{entry.organization}: </span>
-                    <a
-                      href={`tel:${entry.number.replace(/[^\d+]/g, "")}`}
-                      className="text-accent underline underline-offset-2"
-                    >
-                      {entry.number}
-                    </a>
-                    <p className="text-sm text-muted">{entry.when_to_call}</p>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
-        </div>
-      )}
-
-      <div className={card}>
-        {b.uncertainties.length > 0 && (
-          <Section title={t.uncertainties}>
-            <BulletList items={b.uncertainties} />
-          </Section>
-        )}
-        <Section title={t.sources} note={b.sources.length > 0 ? t.sourcesNote : undefined}>
-          <SourceList sources={b.sources} scope="b" t={t} />
-        </Section>
-      </div>
-
-      <div className={card}>
-        <Section title={t.followUpTitle}>
-          <FollowUpChat
-            t={t}
-            language={props.language}
-            state={props.state}
-            originalQuestion={props.question}
-            briefing={b}
-          />
-        </Section>
-      </div>
+              );
+            })}
+          </ul>
+        </LayoutGroup>
+      </nav>
+      {/* Spacing between sections comes from app/briefing/template.tsx. */}
+      <div className="max-w-3xl">{children}</div>
     </article>
+  );
+}
+
+// Each section renders only inside BriefingFrame, which handles the
+// no-briefing and out-of-scope cases.
+function useBriefing(): { t: Dictionary; b: Briefing; fromDocument: boolean } | null {
+  const { t, result } = useCivica();
+  return result?.briefing.in_scope ? { t, b: result.briefing, fromDocument: result.fromDocument } : null;
+}
+
+// A key fact with numbered footnotes. Clicking a number opens that source
+// inline, with a link to the full list.
+function Fact({ fact, b, t }: { fact: Briefing["key_facts"][number]; b: Briefing; t: Dictionary }) {
+  const [open, setOpen] = useState<number | null>(null);
+  const source = b.sources.find((s) => s.id === open);
+  return (
+    <li>
+      {fact.fact}
+      {fact.source_ids.length > 0 ? (
+        fact.source_ids.map((id) => (
+          <button
+            key={id}
+            type="button"
+            aria-expanded={open === id}
+            onClick={() => setOpen(open === id ? null : id)}
+            className={`${citationClass} ${open === id ? "bg-cite-soft" : ""}`}
+          >
+            {id}
+          </button>
+        ))
+      ) : (
+        <UnsourcedLabel t={t} />
+      )}
+      <AnimatePresence initial={false}>
+        {source && (
+          <motion.span
+            key={source.id}
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={softSpring}
+            className="block overflow-hidden"
+          >
+            <span className="mt-2 block border-l-2 border-cite bg-cite-soft/60 px-3 py-2 text-sm">
+              <span className="font-semibold text-cite">{source.id}</span>{" "}
+              <ExternalLink href={source.url}>{source.title}</ExternalLink>
+              {source.publisher && <span className="text-muted"> · {source.publisher}</span>}{" "}
+              <Link href={`${SOURCES_PATH}#${sourceAnchor("b", source.id)}`} className="whitespace-nowrap text-muted underline underline-offset-2">
+                {t.allSources}
+              </Link>
+            </span>
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </li>
+  );
+}
+
+export function OverviewSection() {
+  const data = useBriefing();
+  if (!data) return null;
+  const { t, b, fromDocument } = data;
+  // A document gets "what it is / does / could mean for you" framing.
+  const labels = fromDocument
+    ? { summary: t.docWhatItIs, does: t.docWhatItDoes, matters: t.docMeansForYou }
+    : { summary: t.summary, does: t.whatItDoes, matters: t.whyItMatters };
+  return (
+    <>
+      <Section title={labels.summary}>
+        <p className="font-serif text-xl leading-relaxed">{b.summary}</p>
+      </Section>
+      {b.what_it_does.length > 0 && (
+        <Section title={labels.does}>
+          <BulletList items={b.what_it_does} />
+        </Section>
+      )}
+      {b.why_it_matters.length > 0 && (
+        <Section title={labels.matters}>
+          <BulletList items={b.why_it_matters} />
+        </Section>
+      )}
+      {b.key_facts.length > 0 && (
+        <Section title={t.keyFacts}>
+          <ol className="list-decimal space-y-2 pl-5 marker:text-muted">
+            {b.key_facts.map((fact, i) => (
+              <Fact key={i} fact={fact} b={b} t={t} />
+            ))}
+          </ol>
+        </Section>
+      )}
+      {b.uncertainties.length > 0 && (
+        <Section title={t.uncertainties}>
+          <BulletList items={b.uncertainties} />
+        </Section>
+      )}
+    </>
+  );
+}
+
+// Viewpoints as equal columns divided by rules, labeled by neutral letters;
+// no colors, so neither side reads as the "good" one.
+export function PerspectivesSection() {
+  const data = useBriefing();
+  if (!data) return null;
+  const { t, b } = data;
+  if (b.perspectives.length === 0) return <Empty text={t.nothingHere} />;
+  return (
+    <>
+      <Section title={t.perspectives} note={t.perspectivesNote}>
+        <Stagger className="border-t border-line md:flex md:divide-x md:divide-line">
+          {b.perspectives.map((perspective, i) => (
+            <StaggerItem
+              key={i}
+              className="space-y-3 border-b border-line py-5 last:border-b-0 md:flex-1 md:basis-0 md:border-b-0 md:px-5 md:first:pl-0 md:last:pr-0"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted [:lang(ko)_&]:tracking-normal">
+                {t.viewpoint} {String.fromCharCode(65 + i)}
+              </p>
+              <h3 className="font-serif text-xl font-semibold leading-snug">{perspective.viewpoint}</h3>
+              <p className="text-sm">
+                <span className="font-semibold">{t.coreValues}: </span>
+                {perspective.core_values}
+              </p>
+              <BulletList items={perspective.main_arguments} />
+            </StaggerItem>
+          ))}
+        </Stagger>
+      </Section>
+      {b.common_ground.length > 0 && (
+        <Section title={t.commonGround}>
+          <BulletList items={b.common_ground} />
+        </Section>
+      )}
+      {b.questions_to_consider.length > 0 && (
+        <Section title={t.questionsToConsider}>
+          <BulletList items={b.questions_to_consider} />
+        </Section>
+      )}
+    </>
+  );
+}
+
+export function TermsSection() {
+  const data = useBriefing();
+  if (!data) return null;
+  const { t, b } = data;
+  if (b.key_terms.length === 0) return <Empty text={t.nothingHere} />;
+  return (
+    <Section title={t.keyTerms}>
+      <Stagger as="dl" className="divide-y divide-line">
+        {b.key_terms.map((term) => (
+          <StaggerItem key={term.term} className="grid gap-1 py-3 sm:grid-cols-[12rem_1fr] sm:gap-6">
+            <dt className="font-serif font-semibold">{term.term}</dt>
+            <dd className="text-muted">{term.definition}</dd>
+          </StaggerItem>
+        ))}
+      </Stagger>
+    </Section>
+  );
+}
+
+export function ContactsSection() {
+  const { result, officials } = useCivica();
+  const data = useBriefing();
+  if (!data || !result) return null;
+  const { t, b } = data;
+  const officialsForState = result.state && officials?.state === result.state ? officials : null;
+  return (
+    <>
+      <Section title={t.yourOfficials}>
+        {officialsForState ? (
+          <Officials officials={officialsForState.officials} error={officialsForState.error} t={t} />
+        ) : (
+          <p className="text-muted">
+            {t.noOfficialsYet}{" "}
+            <Link href="/representatives" className="text-accent underline underline-offset-2">
+              {t.setYourState}
+            </Link>
+          </p>
+        )}
+      </Section>
+      {b.leaders.length > 0 && (
+        <Section title={t.leaders}>
+          <ul className="divide-y divide-line">
+            {b.leaders.map((leader, i) => (
+              <li key={i} className="py-3">
+                <span className="font-semibold">{leader.name}</span>
+                <span className="text-muted"> · {leader.role}</span>
+                <p className="text-sm">{leader.relevance}</p>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+      {b.helpful_websites.length > 0 && (
+        <Section title={t.websites}>
+          <ul className="divide-y divide-line">
+            {b.helpful_websites.map((site) => (
+              <li key={site.url} className="py-3">
+                <ExternalLink href={site.url}>{site.name}</ExternalLink>
+                <p className="text-sm text-muted">{site.description}</p>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+      {b.phone_numbers.length > 0 && (
+        <Section title={t.phoneNumbers} note={t.phoneWarning}>
+          <ul className="divide-y divide-line">
+            {b.phone_numbers.map((entry, i) => (
+              <li key={i} className="py-3">
+                <span className="font-semibold">{entry.organization}: </span>
+                <a
+                  href={`tel:${entry.number.replace(/[^\d+]/g, "")}`}
+                  className="text-accent underline underline-offset-2"
+                >
+                  {entry.number}
+                </a>
+                <p className="text-sm text-muted">{entry.when_to_call}</p>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+    </>
+  );
+}
+
+export function SourcesSection() {
+  const data = useBriefing();
+  if (!data) return null;
+  const { t, b } = data;
+  return (
+    <Section title={t.sources} note={b.sources.length > 0 ? t.sourcesNote : undefined}>
+      <SourceList sources={b.sources} scope="b" t={t} />
+    </Section>
+  );
+}
+
+export function FollowUpSection() {
+  const { language, result } = useCivica();
+  const data = useBriefing();
+  if (!data || !result) return null;
+  const { t, b } = data;
+  return (
+    <Section title={t.followUpTitle}>
+      <FollowUpChat t={t} language={language} state={result.state} originalQuestion={result.question} briefing={b} />
+    </Section>
   );
 }

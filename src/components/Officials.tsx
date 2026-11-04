@@ -1,15 +1,16 @@
 import type { Dictionary } from "@/lib/i18n";
 import type { FederalOfficial, OfficialsResult } from "@/lib/officials";
 import { isSafeHttpUrl } from "@/lib/sources";
+import { Stagger, StaggerItem } from "./motion";
 import { ExternalLink } from "./ui";
 
 const FIND_REP_URL = "https://www.house.gov/representatives/find-your-representative";
 
 function OfficialCard({ official, label, t }: { official: FederalOfficial; label: string; t: Dictionary }) {
   return (
-    <div className="space-y-1 rounded-xl border border-line p-4">
+    <StaggerItem className="space-y-1 rounded-lg border border-line bg-surface p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
-      <p className="font-semibold">{official.name}</p>
+      <p className="font-serif text-lg font-semibold">{official.name}</p>
       <p className="text-sm text-muted">
         {official.party}
         {official.chamber === "house" &&
@@ -28,7 +29,7 @@ function OfficialCard({ official, label, t }: { official: FederalOfficial; label
           <ExternalLink href={official.contactForm}>{t.contact}</ExternalLink>
         )}
       </div>
-    </div>
+    </StaggerItem>
   );
 }
 
@@ -39,14 +40,14 @@ export function Officials(props: { officials: OfficialsResult | null; error: boo
   }
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <Stagger className="grid gap-3 sm:grid-cols-2">
         {officials.senators.map((senator) => (
           <OfficialCard key={senator.name} official={senator} label={t.senator} t={t} />
         ))}
         {officials.representative && (
           <OfficialCard official={officials.representative} label={t.representative} t={t} />
         )}
-      </div>
+      </Stagger>
       {!officials.representative && (
         <p className="text-sm">
           {officials.addressMatched === false && <span className="text-muted">{t.addressNotMatched} </span>}

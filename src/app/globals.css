@@ -1,35 +1,47 @@
 @import "tailwindcss";
 
-/* Deliberately neutral palette: no party-coded reds or blues. */
+/*
+ * Civica's tokens. Deliberately neutral: no party-coded reds or blues.
+ * - accent: the brand green (primary actions, active navigation)
+ * - cite:   ochre, reserved for citations and sources
+ * - warn / error: semantic states only
+ * Text colors meet WCAG AA (4.5:1) on both paper and surface.
+ */
 :root {
-  --canvas: #f7f6f2;
+  --canvas: #f7f5ef; /* paper */
   --surface: #ffffff;
-  --ink: #1c1f23;
-  --muted: #5b6168;
-  --line: #e2e0d8;
-  --accent: #0f6e66;
+  --ink: #1a1d1f;
+  --muted: #565d63;
+  --line: #dcd7cc;
+  --accent: #0f5c55;
   --accent-ink: #ffffff;
-  --accent-soft: #e3f1ef;
-  --warn-soft: #fbf3e2;
+  --accent-hover: #0b4843;
+  --accent-soft: #e3eeeb;
+  --cite: #845500;
+  --cite-soft: #f5ead3;
+  --warn-soft: #fbf1dc;
   --warn-ink: #7a5310;
-  --error-soft: #fbeaea;
-  --error-ink: #8a1f1f;
+  --error-soft: #f9e7e3;
+  --error-ink: #9b2c1f;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: #15171a;
-    --surface: #1d2024;
-    --ink: #eceae4;
-    --muted: #a3a8ae;
-    --line: #33373d;
-    --accent: #4fb8ac;
-    --accent-ink: #0d1514;
-    --accent-soft: #1b3330;
+    --canvas: #131517;
+    --surface: #1a1d20;
+    --ink: #ece8df;
+    --muted: #a6adb3;
+    --line: #30353a;
+    --accent: #5cc2b4;
+    --accent-ink: #0b1514;
+    --accent-hover: #7ad3c6;
+    --accent-soft: #17302c;
+    --cite: #e0b45c;
+    --cite-soft: #2c2414;
     --warn-soft: #2f2716;
     --warn-ink: #e8c27a;
-    --error-soft: #3a1f1f;
-    --error-ink: #f1a9a9;
+    --error-soft: #3a1d18;
+    --error-ink: #f0a99c;
   }
 }
 
@@ -41,20 +53,43 @@
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
+  --color-accent-hover: var(--accent-hover);
   --color-accent-soft: var(--accent-soft);
+  --color-cite: var(--cite);
+  --color-cite-soft: var(--cite-soft);
   --color-warn-soft: var(--warn-soft);
   --color-warn-ink: var(--warn-ink);
   --color-error-soft: var(--error-soft);
   --color-error-ink: var(--error-ink);
-  /* System fonts render Korean (and later Chinese) well without downloads. */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo",
-    "Malgun Gothic", "Noto Sans KR", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  /* Self-hosted (fontsource). Hangul falls through to Noto Sans KR. */
+  --font-sans: "Public Sans Variable", "Noto Sans KR", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-serif: "Source Serif 4 Variable", "Noto Sans KR", ui-serif, Georgia, "Times New Roman", serif;
 }
 
 body {
-  background: var(--canvas);
+  background-color: var(--canvas);
   color: var(--ink);
   font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Hangul needs more air, and words should not break mid-syllable-block. */
+html:lang(ko) body {
+  line-height: 1.8;
+  word-break: keep-all;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
 }
 
 :focus-visible {

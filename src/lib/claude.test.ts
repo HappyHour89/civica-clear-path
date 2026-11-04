@@ -1,8 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { Messages } from "@anthropic-ai/sdk/resources/beta/messages/messages";
+import { Messages as StandardMessages } from "@anthropic-ai/sdk/resources/messages/messages";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as askRoute } from "../app/api/ask/route";
-import { CivicaError, research } from "./claude";
+import { CivicaError, parseJsonAnswer, research, resetProviderStateForTests } from "./claude";
 import { BriefingSchema, FollowUpSchema } from "./schemas";
 import { sampleBriefing } from "./testFixtures";
 
@@ -33,6 +34,7 @@ const followUp = { answer: "Cloture needs 60 votes [1].", sources: [] };
 describe("research", () => {
   beforeEach(() => {
     process.env.ANTHROPIC_API_KEY = "test-key";
+    resetProviderStateForTests();
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -83,6 +85,224 @@ describe("research", () => {
     const tools = params.tools as { name: string; strict?: boolean; max_uses?: number }[];
     expect(tools[0]).toMatchObject({ name: "web_search", max_uses: 3 });
     expect(tools[1]).toMatchObject({ name: "submit_answer", strict: true });
+  });
+
+  it("sends a plain Messages request to Meta AI when CIVICA_PROVIDER=meta", async () => {
+    process.env.CIVICA_PROVIDER = "meta";
+    process.env.META_AI_API_KEY = "meta-key";
+    try {
+      const spy = mockResponses({ stop_reason: "tool_use", content: [toolCall("submit_answer", followUp)] });
+      await research({
+        messages: [{ role: "user", content: "q" }],
+        toolName: "submit_answer",
+        toolDescription: "d",
+        schema: FollowUpSchema,
+        maxSearches: 3,
+      });
+      const params = spy.mock.calls[0][0] as unknown as Record<string, unknown>;
+      expect(params.model).toBe("muse-wonder-1.0");
+      expect(params).not.toHaveProperty("betas");
+      expect(params).not.toHaveProperty("fallbacks");
+      expect(params).not.toHaveProperty("output_config");
+      const client = spy.mock.contexts[0] as unknown as { _client: Anthropic };
+      expect(client._client.baseURL).toBe("https://api.meta.ai");
+      expect(client._client.authToken).toBe("meta-key");
+      expect(client._client.apiKey).toBeNull();
+    } finally {
+      delete process.env.CIVICA_PROVIDER;
+      delete process.env.META_AI_API_KEY;
+    }
+  });
+
+  it("retries Meta with a minimal request after a 400, and keeps using it", async () => {
+    process.env.CIVICA_PROVIDER = "meta";
+    process.env.META_AI_API_KEY = "meta-key";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const spy = vi.spyOn(Messages.prototype, "create");
+      spy.mockRejectedValueOnce(new Anthropic.BadRequestError(400, undefined, "unknown tool type", new Headers()));
+      spy.mockResolvedValue({ stop_reason: "tool_use", content: [toolCall("submit_answer", followUp)] } as never);
+      const options = {
+        messages: [{ role: "user" as const, content: "q" }],
+        toolName: "submit_answer",
+        toolDescription: "d",
+        schema: FollowUpSchema,
+        maxSearches: 3,
+      };
+      const { data } = await research(options);
+      expect(data).toEqual(followUp);
+      await research(options);
+
+      type Params = { tools: { name: string; strict?: boolean }[]; system: unknown };
+      const [full, retry, next] = spy.mock.calls.map((call) => call[0] as unknown as Params);
+      expect(full.tools.map((t) => t.name)).toEqual(["web_search", "submit_answer"]);
+      for (const minimal of [retry, next]) {
+        expect(minimal.tools).toHaveLength(1);
+        expect(minimal.tools[0]).not.toHaveProperty("strict");
+        expect(typeof minimal.system).toBe("string");
+      }
+      expect(spy).toHaveBeenCalledTimes(3);
+    } finally {
+      delete process.env.CIVICA_PROVIDER;
+      delete process.env.META_AI_API_KEY;
+    }
+  });
+
+  it("falls back to a no-tools JSON answer when Meta rejects tool requests", async () => {
+    process.env.CIVICA_PROVIDER = "meta";
+    process.env.META_AI_API_KEY = "meta-key";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const toolSpy = vi.spyOn(Messages.prototype, "create");
+      toolSpy.mockRejectedValue(new Anthropic.BadRequestError(400, undefined, "tools not supported", new Headers()));
+      const textSpy = vi.spyOn(StandardMessages.prototype, "create").mockResolvedValue({
+        stop_reason: "end_turn",
+        content: [{ type: "text", text: "```json\n" + JSON.stringify(followUp) + "\n```" }],
+      } as never);
+      const options = {
+        messages: [{ role: "user" as const, content: "q" }],
+        toolName: "submit_answer",
+        toolDescription: "d",
+        schema: FollowUpSchema,
+        maxSearches: 3,
+      };
+      const { data, searchedUrls } = await research(options);
+      expect(data).toEqual(followUp);
+      expect(searchedUrls.size).toBe(0);
+      expect(toolSpy).toHaveBeenCalledTimes(2);
+      const params = textSpy.mock.calls[0][0] as unknown as Record<string, unknown>;
+      expect(params).not.toHaveProperty("tools");
+      expect(params.system).toContain("JSON Schema");
+
+      // Later requests go straight to the JSON form.
+      await research(options);
+      expect(toolSpy).toHaveBeenCalledTimes(2);
+      expect(textSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      delete process.env.CIVICA_PROVIDER;
+      delete process.env.META_AI_API_KEY;
+    }
+  });
+
+  it("keeps the provider's reason out of the user-facing error", async () => {
+    process.env.CIVICA_PROVIDER = "meta";
+    process.env.META_AI_API_KEY = "meta-key";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const body = { type: "error", error: { type: "invalid_request_error", message: "model: unknown model" } };
+    try {
+      vi.spyOn(Messages.prototype, "create").mockRejectedValue(
+        new Anthropic.BadRequestError(400, body, "400 raw", new Headers()),
+      );
+      vi.spyOn(StandardMessages.prototype, "create").mockRejectedValue(
+        new Anthropic.BadRequestError(400, body, "400 raw", new Headers()),
+      );
+      const error = await research({
+        messages: [{ role: "user", content: "q" }],
+        toolName: "t",
+        toolDescription: "d",
+        schema: FollowUpSchema,
+        maxSearches: 1,
+      }).catch((e) => e);
+      expect(error).toBeInstanceOf(CivicaError);
+      expect(error.status).toBe(400);
+      expect(error.message).not.toContain("unknown model");
+    } finally {
+      delete process.env.CIVICA_PROVIDER;
+      delete process.env.META_AI_API_KEY;
+    }
+  });
+
+  it("parses JSON answers wrapped in prose and reports schema problems", () => {
+    expect(parseJsonAnswer(`Sure! ${JSON.stringify(followUp)} Hope that helps.`, FollowUpSchema)).toEqual({
+      ok: true,
+      data: followUp,
+    });
+    const bad = parseJsonAnswer('{"answer": 5}', FollowUpSchema);
+    expect(bad.ok).toBe(false);
+    expect(parseJsonAnswer("no json here", FollowUpSchema)).toEqual({ ok: false, error: "no JSON object found" });
+  });
+
+  it("turns a billing rejection into a friendly 503", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const body = { type: "error", error: { type: "invalid_request_error", message: "Your credit balance is too low" } };
+    vi.spyOn(Messages.prototype, "create").mockRejectedValueOnce(
+      new Anthropic.BadRequestError(400, body, "400 raw", new Headers()),
+    );
+    const error = await research({ messages: [], toolName: "t", toolDescription: "d", schema: FollowUpSchema, maxSearches: 1 }).catch((e) => e);
+    expect(error.status).toBe(503);
+    expect(error.message).not.toMatch(/credit/i);
+  });
+
+  it("does not retry Claude after a 400", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const spy = vi
+      .spyOn(Messages.prototype, "create")
+      .mockRejectedValueOnce(new Anthropic.BadRequestError(400, undefined, "bad", new Headers()));
+    await expect(
+      research({ messages: [], toolName: "t", toolDescription: "d", schema: FollowUpSchema, maxSearches: 1 }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses Meta mode for the Claude Code-style ANTHROPIC_BASE_URL setup", async () => {
+    const saved = { ...process.env };
+    delete process.env.ANTHROPIC_API_KEY;
+    process.env.ANTHROPIC_BASE_URL = "https://api.meta.ai";
+    process.env.ANTHROPIC_AUTH_TOKEN = "meta-token";
+    process.env.ANTHROPIC_MODEL = "muse-wonder-1.0";
+    try {
+      const spy = mockResponses({ stop_reason: "tool_use", content: [toolCall("submit_answer", followUp)] });
+      await research({
+        messages: [{ role: "user", content: "q" }],
+        toolName: "submit_answer",
+        toolDescription: "d",
+        schema: FollowUpSchema,
+        maxSearches: 3,
+      });
+      const params = spy.mock.calls[0][0] as unknown as Record<string, unknown>;
+      expect(params.model).toBe("muse-wonder-1.0");
+      expect(params).not.toHaveProperty("betas");
+      const client = spy.mock.contexts[0] as unknown as { _client: Anthropic };
+      expect(client._client.baseURL).toBe("https://api.meta.ai");
+      expect(client._client.authToken).toBe("meta-token");
+    } finally {
+      process.env = saved;
+    }
+  });
+
+  it("can turn web search off for providers that lack it", async () => {
+    process.env.CIVICA_WEB_SEARCH = "off";
+    try {
+      const spy = mockResponses({ stop_reason: "tool_use", content: [toolCall("submit_answer", followUp)] });
+      await research({
+        messages: [{ role: "user", content: "q" }],
+        toolName: "submit_answer",
+        toolDescription: "d",
+        schema: FollowUpSchema,
+        maxSearches: 3,
+      });
+      const params = spy.mock.calls[0][0] as unknown as { tools: { name: string }[] };
+      expect(params.tools.map((t) => t.name)).toEqual(["submit_answer"]);
+    } finally {
+      delete process.env.CIVICA_WEB_SEARCH;
+    }
+  });
+
+  it("names the Meta key when it is missing", async () => {
+    process.env.CIVICA_PROVIDER = "meta";
+    try {
+      const error = await research({
+        messages: [],
+        toolName: "t",
+        toolDescription: "d",
+        schema: FollowUpSchema,
+        maxSearches: 1,
+      }).catch((e) => e);
+      expect(error).toBeInstanceOf(CivicaError);
+      expect(error.message).toContain("META_AI_API_KEY");
+    } finally {
+      delete process.env.CIVICA_PROVIDER;
+    }
   });
 
   it("asks for the tool when Claude answers in prose", async () => {
@@ -181,6 +401,17 @@ describe("POST /api/ask", () => {
     expect(prompt).toContain("Korean");
     expect(prompt).toContain("California (CA)");
     expect(prompt).toContain("<user_question>\nWhat is the filibuster?\n</user_question>");
+  });
+
+  it("does not expose the AI provider's reason in error responses", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const body = { type: "error", error: { type: "invalid_request_error", message: "max_tokens too large" } };
+    vi.spyOn(Messages.prototype, "create").mockRejectedValueOnce(
+      new Anthropic.BadRequestError(400, body, "400 raw", new Headers()),
+    );
+    const response = await askRoute(askRequest({ question: "q", language: "en" }, "10.0.0.9"));
+    expect(response.status).toBe(400);
+    expect(JSON.stringify(await response.json())).not.toContain("max_tokens");
   });
 
   it("requires a question or a file", async () => {

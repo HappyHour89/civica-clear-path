@@ -8,8 +8,8 @@ export const sampleBriefing: Briefing = {
   what_it_does: ["Requires 60 votes to end debate on most legislation."],
   why_it_matters: ["It shapes which bills can pass with a narrow majority."],
   key_facts: [
-    { fact: "Ending debate (cloture) requires three-fifths of senators.", source_ids: [1] },
-    { fact: "A claim whose source was not retrieved.", source_ids: [2] },
+    { fact: "Ending debate (cloture) requires three-fifths of senators.", source_ids: [1], disputed: false },
+    { fact: "A claim whose source was not retrieved.", source_ids: [2], disputed: true },
   ],
   perspectives: [
     {
@@ -34,8 +34,24 @@ export const sampleBriefing: Briefing = {
   phone_numbers: [{ organization: "U.S. Capitol Switchboard", number: "(202) 224-3121", when_to_call: "To reach any member's office." }],
   uncertainties: ["Proposals to change the rule are ongoing."],
   sources: [
-    { id: 1, title: "About Filibusters and Cloture", url: "https://www.senate.gov/about/powers-procedures/filibusters-cloture.htm", publisher: "U.S. Senate" },
-    { id: 2, title: "Invented page", url: "https://example.com/made-up", publisher: "Unknown" },
+    {
+      id: 1,
+      title: "About Filibusters and Cloture",
+      url: "https://www.senate.gov/about/powers-procedures/filibusters-cloture.htm",
+      publisher: "U.S. Senate",
+      source_type: "government",
+      published: "",
+      excerpt: "Cloture is the only procedure by which the Senate can vote to place a time limit on consideration of a bill.",
+    },
+    {
+      id: 2,
+      title: "Invented page",
+      url: "https://example.com/made-up",
+      publisher: "Unknown",
+      source_type: "other",
+      published: "2026-01-01",
+      excerpt: "",
+    },
   ],
   follow_up_suggestions: ["When was the filibuster created?"],
 };

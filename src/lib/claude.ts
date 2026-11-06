@@ -88,7 +88,7 @@ type ResearchOptions<T> = {
   maxSearches: number;
 };
 
-type ResearchResult<T> = { data: T; searchedUrls: Set<string> };
+type ResearchResult<T> = { data: T; searchedUrls: Set<string>; pageAges: Map<string, string> };
 
 // Meta's endpoint may not support every Claude feature, so a rejected request
 // steps down to a simpler form: first without web search, strict tools or
@@ -138,10 +138,11 @@ async function researchWithTools<T>(
 ): Promise<ResearchResult<T>> {
   const messages = [...options.messages];
   const searchedUrls = new Set<string>();
+  const pageAges = new Map<string, string>();
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const response = await client.beta.messages.create(buildRequest(provider, { ...options, messages }, level));
-    collectSearchResultUrls(response.content, searchedUrls);
+    collectSearchResultUrls(response.content, searchedUrls, pageAges);
 
     if (response.stop_reason === "refusal") {
       throw new CivicaError("This request couldn't be answered. Try rephrasing your question.", 422);
@@ -157,7 +158,7 @@ async function researchWithTools<T>(
         console.error("Claude returned an invalid answer shape", parsed.error.issues);
         throw new CivicaError("The answer came back in an unexpected format. Please try again.", 502);
       }
-      return { data: parsed.data, searchedUrls };
+      return { data: parsed.data, searchedUrls, pageAges };
     }
 
     if (response.stop_reason === "max_tokens") {
@@ -208,7 +209,7 @@ async function researchWithJson<T>(
       .flatMap((block) => (block.type === "text" ? [block.text] : []))
       .join("");
     const problem = parseJsonAnswer(text, options.schema);
-    if (problem.ok) return { data: problem.data, searchedUrls: new Set() };
+    if (problem.ok) return { data: problem.data, searchedUrls: new Set(), pageAges: new Map() };
     console.error("Meta AI returned an unusable JSON answer", problem.error);
     if (response.stop_reason === "max_tokens") {
       throw new CivicaError("The answer was too long to finish. Try a narrower question.", 502);

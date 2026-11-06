@@ -4,7 +4,7 @@ import { enforceRateLimit, errorResponse, todayIso } from "@/lib/http";
 import { isLanguage } from "@/lib/i18n";
 import { describeRequestContext } from "@/lib/prompts";
 import { BriefingSchema } from "@/lib/schemas";
-import { isSafeHttpUrl, keepVerifiedSources } from "@/lib/sources";
+import { isSafeHttpUrl, verifySources } from "@/lib/sources";
 import { isStateCode } from "@/lib/states";
 import { fileToContentBlock } from "@/lib/upload";
 
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
         .join("\n\n"),
     });
 
-    const { data, searchedUrls } = await research({
+    const { data, searchedUrls, pageAges } = await research({
       messages: [{ role: "user", content }],
       toolName: "submit_briefing",
       toolDescription: "Submit the finished, neutral civic briefing for the user's question.",
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       throw error;
     });
 
-    const sources = keepVerifiedSources(data.sources, searchedUrls);
+    const sources = verifySources(data.sources, searchedUrls, pageAges);
     const sourceIds = new Set(sources.map((s) => s.id));
     const briefing = {
       ...data,

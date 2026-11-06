@@ -86,6 +86,35 @@ const en = {
   navRepresentatives: "My representatives",
   navBriefing: "Your briefing",
   navAbout: "About",
+  navSupport: "Support",
+  supportTitle: "Support Civica",
+  supportIntro:
+    "Civica is free, and its core will stay free: asking questions, explaining documents, and finding your representatives. Readers who chip in keep it running.",
+  donateTitle: "Make a donation",
+  donateBody:
+    "Donations pay for the AI research behind every answer and the servers that run Civica. Give once or monthly through Ko-fi.",
+  donateButton: "Donate on Ko-fi",
+  donateSoon: "Donations open soon.",
+  donateNeutral: "Donating never changes what Civica says: every answer follows the same neutrality rules.",
+  premiumTitle: "Civica Premium",
+  premiumBadge: "Planned",
+  premiumIntro:
+    "Premium will add tools for following issues over time. It isn't available yet, and nothing is charged for it. Join the waitlist and you'll hear when it launches.",
+  premiumFeatures: [
+    { title: "Legislative tracker", body: "Follow bills and see status changes, amendments, and votes as they happen." },
+    { title: "Daily civic briefing", body: "Five minutes on what changed in your government, every story with sources." },
+    { title: "Research collections", body: "Save briefings and organize them by topic." },
+    { title: "Explain it differently", body: "The same issue in simpler terms, or through legal, economic, or historical lenses." },
+    { title: "Shareable reports", body: "Citation-rich reports you can share or print." },
+  ],
+  waitlistLabel: "Email",
+  waitlistPlaceholder: "you@example.com",
+  waitlistButton: "Join the waitlist",
+  waitlistJoining: "Joining…",
+  waitlistDone: "You're on the list. You'll get an email when Premium launches.",
+  waitlistPrivacy:
+    "Your email is stored privately and used only to tell you when Premium launches. It is never shared or sold.",
+  waitlistInvalid: "Enter a valid email address.",
   documentIntro:
     "Got a bill, ballot measure, court letter, or article you can't decode? Upload it. Civica tells you what it is, what it actually does, and what it could mean for you.",
   documentFileLabel: "Document",
@@ -131,7 +160,7 @@ const en = {
     "Civica exists because the documents that shape your life — bills, ballot measures, court notices — are written for lawyers, not for you.",
     "Ask a question or upload a document, and Civica explains it in plain language: what it is, what it does, and why people disagree about it. Every major viewpoint gets its strongest version, side by side. Civica never tells you what to conclude.",
     "Key facts link to sources retrieved while answering your question. Anything that couldn't be tied to a source is labeled.",
-    "Civica doesn't save your questions, files, or address. Your state and language are remembered only in your own browser. Civica is an educational tool, not legal advice. AI can make mistakes, so check the sources.",
+    "Civica doesn't save your questions, files, or address. Your state and language are remembered only in your own browser. If you join the Premium waitlist, your email is stored privately for that purpose only. Civica is an educational tool, not legal advice. AI can make mistakes, so check the sources.",
   ],
 };
 
@@ -214,6 +243,33 @@ const ko: Dictionary = {
   navRepresentatives: "내 지역 의원",
   navBriefing: "내 브리핑",
   navAbout: "소개",
+  navSupport: "후원",
+  supportTitle: "Civica 후원하기",
+  supportIntro:
+    "Civica는 무료이며, 핵심 기능인 질문하기, 문서 설명, 내 지역 의원 찾기는 앞으로도 무료입니다. 독자 여러분의 후원이 Civica를 운영합니다.",
+  donateTitle: "후원하기",
+  donateBody: "후원금은 모든 답변 뒤의 AI 조사 비용과 Civica 서버 운영에 쓰입니다. Ko-fi에서 한 번 또는 매월 후원할 수 있습니다.",
+  donateButton: "Ko-fi에서 후원하기",
+  donateSoon: "후원은 곧 열립니다.",
+  donateNeutral: "후원은 Civica의 답변 내용에 영향을 주지 않습니다. 모든 답변은 같은 중립성 원칙을 따릅니다.",
+  premiumTitle: "Civica 프리미엄",
+  premiumBadge: "준비 중",
+  premiumIntro:
+    "프리미엄은 이슈를 꾸준히 따라갈 수 있는 도구를 제공할 예정입니다. 아직 이용할 수 없으며 요금도 청구되지 않습니다. 대기자 명단에 등록하면 출시 소식을 알려 드립니다.",
+  premiumFeatures: [
+    { title: "법안 추적", body: "법안을 팔로우하고 진행 상황, 수정안, 표결을 실시간으로 확인합니다." },
+    { title: "데일리 시민 브리핑", body: "정부에서 무엇이 바뀌었는지 5분 안에, 모든 소식에 출처와 함께." },
+    { title: "리서치 컬렉션", body: "브리핑을 저장하고 주제별로 정리합니다." },
+    { title: "다르게 설명하기", body: "같은 이슈를 더 쉽게, 또는 법률·경제·역사적 관점으로 설명합니다." },
+    { title: "공유 가능한 보고서", body: "출처가 풍부한 보고서를 공유하거나 인쇄할 수 있습니다." },
+  ],
+  waitlistLabel: "이메일",
+  waitlistPlaceholder: "you@example.com",
+  waitlistButton: "대기자 명단 등록",
+  waitlistJoining: "등록 중…",
+  waitlistDone: "등록되었습니다. 프리미엄이 출시되면 이메일로 알려 드립니다.",
+  waitlistPrivacy: "이메일은 비공개로 저장되며 프리미엄 출시 안내에만 사용됩니다. 공유하거나 판매하지 않습니다.",
+  waitlistInvalid: "올바른 이메일 주소를 입력하세요.",
   documentIntro:
     "이해하기 어려운 법안, 주민투표 안건, 법원 서신, 기사가 있나요? 업로드하세요. Civica가 무엇인지, 실제로 무엇을 하는지, 나에게 어떤 의미인지 알려 드립니다.",
   documentFileLabel: "문서",
@@ -258,7 +314,7 @@ const ko: Dictionary = {
     "법안, 주민투표 안건, 법원 통지서처럼 우리 삶을 좌우하는 문서는 일반인이 아니라 법률가를 위해 쓰여 있습니다. Civica는 그래서 만들어졌습니다.",
     "질문하거나 문서를 업로드하면 Civica가 쉬운 말로 설명합니다. 무엇인지, 무엇을 하는지, 사람들이 왜 의견이 다른지. 주요 관점마다 가장 강력한 논거를 나란히 보여 주며, 어떤 결론을 내려야 하는지는 절대 말하지 않습니다.",
     "핵심 사실은 질문에 답하는 동안 실제로 검색된 출처와 연결됩니다. 출처를 확인하지 못한 내용은 따로 표시됩니다.",
-    "Civica는 질문, 파일, 주소를 저장하지 않습니다. 거주 주와 언어 설정은 사용자의 브라우저에만 저장됩니다. Civica는 교육용 도구이며 법률 자문이 아닙니다. AI는 실수할 수 있으니 출처를 확인하세요.",
+    "Civica는 질문, 파일, 주소를 저장하지 않습니다. 거주 주와 언어 설정은 사용자의 브라우저에만 저장됩니다. 프리미엄 대기자 명단에 등록하면 이메일만 해당 목적으로 비공개 저장됩니다. Civica는 교육용 도구이며 법률 자문이 아닙니다. AI는 실수할 수 있으니 출처를 확인하세요.",
   ],
 };
 

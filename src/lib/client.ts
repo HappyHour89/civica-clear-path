@@ -59,3 +59,12 @@ export async function askFollowUp(
   });
   return (await readJson<{ answer: FollowUp }>(response, t, input.language)).answer;
 }
+
+export async function joinWaitlist(email: string, language: Language, t: Dictionary) {
+  const response = await fetch("/api/waitlist", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, language }),
+  });
+  await readJson<{ ok: true }>(response, t, language);
+}

@@ -1,8 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { findOfficials, parseCensusDistrict, parseLegislators } from "./officials";
 import { checkRateLimit } from "./rateLimit";
-import { BriefingSchema, toolInputSchema } from "./schemas";
-import { collectSearchResultUrls, isSafeHttpUrl, keepVerifiedSources, normalizeUrl } from "./sources";
+import { BriefingSchema, type Source, toolInputSchema } from "./schemas";
+import {
+  absoluteDate,
+  collectSearchResultUrls,
+  domainSourceType,
+  effectiveSourceType,
+  evidenceLevel,
+  isSafeHttpUrl,
+  keepVerifiedSources,
+  normalizeUrl,
+  verifySources,
+} from "./sources";
 import { sampleBriefing } from "./testFixtures";
 import { fileToContentBlock } from "./upload";
 
@@ -162,5 +172,70 @@ describe("rate limit", () => {
     expect(checkRateLimit(key, 2, 1000, 10).allowed).toBe(true);
     expect(checkRateLimit(key, 2, 1000, 20)).toEqual({ allowed: false, retryAfterSeconds: 1 });
     expect(checkRateLimit(key, 2, 1000, 1000).allowed).toBe(true);
+  });
+});
+
+describe("source transparency", () => {
+  const source = (url: string, source_type: Source["source_type"], published = ""): Source => ({
+    id: 1,
+    title: "t",
+    url,
+    publisher: "p",
+    source_type,
+    published,
+    excerpt: "",
+  });
+
+  it("types sources from their web address when the address proves it", () => {
+    expect(domainSourceType("https://www.supremecourt.gov/opinions/x.pdf")).toBe("court");
+    expect(domainSourceType("https://www.ca9.uscourts.gov/x")).toBe("court");
+    expect(domainSourceType("https://www.congress.gov/bill/x")).toBe("government");
+    expect(domainSourceType("https://law.stanford.edu/x")).toBe("academic");
+    expect(domainSourceType("https://www.nytimes.com/x")).toBeNull();
+    // A look-alike host is not a government site.
+    expect(domainSourceType("https://gov.example.com/x")).toBeNull();
+  });
+
+  it("prefers the address over the model's label", () => {
+    expect(effectiveSourceType(source("https://www.senate.gov/x", "advocacy"))).toEqual({
+      type: "government",
+      fromDomain: true,
+    });
+    expect(effectiveSourceType(source("https://example.org/x", "research"))).toEqual({
+      type: "research",
+      fromDomain: false,
+    });
+  });
+
+  it("rates the evidence behind a fact by the kinds of sources", () => {
+    expect(evidenceLevel([])).toBe("unsourced");
+    expect(evidenceLevel([source("https://www.congress.gov/x", "other"), source("https://a.org", "advocacy")])).toBe("primary");
+    expect(evidenceLevel([source("https://news.example/x", "journalism")])).toBe("secondary");
+    expect(evidenceLevel([source("https://a.org", "advocacy"), source("https://b.org", "advocacy")])).toBe("advocacy");
+  });
+
+  it("fills a missing date from the search results and drops unretrieved sources", () => {
+    const searched = new Set(["senate.gov/x", "example.org/y"]);
+    const pageAges = new Map([["senate.gov/x", "March 3, 2026"], ["example.org/y", "2 days ago"]]);
+    const result = verifySources(
+      [
+        source("https://www.senate.gov/x/", "government"),
+        source("https://example.org/y", "research", "2025-12-01"),
+        source("https://invented.example/z", "other"),
+      ],
+      searched,
+      pageAges,
+    );
+    expect(result.map((s) => s.published)).toEqual(["March 3, 2026", "2025-12-01"]);
+  });
+
+  it("turns relative page ages into calendar dates", () => {
+    const now = new Date("2026-11-06T12:00:00Z");
+    expect(absoluteDate("80 days ago", now)).toBe("2026-08-18");
+    expect(absoluteDate("2 weeks ago", now)).toBe("2026-10-23");
+    expect(absoluteDate("3 hours ago", now)).toBe("2026-11-06");
+    expect(absoluteDate("1 day ago", now)).toBe("2026-11-05");
+    expect(absoluteDate("4 months ago", now)).toBe("4 months ago");
+    expect(absoluteDate("March 3, 2026", now)).toBe("March 3, 2026");
   });
 });

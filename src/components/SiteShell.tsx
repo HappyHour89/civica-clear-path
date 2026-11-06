@@ -15,6 +15,7 @@ function navItems(t: Dictionary) {
     { href: "/representatives", label: t.navRepresentatives },
     { href: "/briefing", label: t.navBriefing },
     { href: "/about", label: t.navAbout },
+    { href: "/support", label: t.navSupport },
   ];
 }
 

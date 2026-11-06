@@ -10,16 +10,19 @@ import { useCivica } from "./CivicaProvider";
 import { FollowUpChat } from "./FollowUpChat";
 import { ProgressBar, softSpring, spring, Stagger, StaggerItem } from "./motion";
 import { Officials } from "./Officials";
+import { evidenceLevel } from "@/lib/sources";
 import {
   BulletList,
   cardClass,
   citationClass,
+  EvidenceLabel,
   ExternalLink,
   Eyebrow,
   Section,
   sourceAnchor,
+  SourceExcerpt,
   SourceList,
-  UnsourcedLabel,
+  SourceMeta,
 } from "./ui";
 
 const SOURCES_PATH = "/briefing/sources";
@@ -142,29 +145,37 @@ function useBriefing(): { t: Dictionary; b: Briefing; fromDocument: boolean } | 
   return result?.briefing.in_scope ? { t, b: result.briefing, fromDocument: result.fromDocument } : null;
 }
 
-// A key fact with numbered footnotes. Clicking a number opens that source
-// inline, with a link to the full list.
+// A key fact with numbered footnotes and labels for the kind of evidence
+// behind it. Clicking a number opens that source inline: type, date, quoted
+// passage, and a link to the full list.
 function Fact({ fact, b, t }: { fact: Briefing["key_facts"][number]; b: Briefing; t: Dictionary }) {
   const [open, setOpen] = useState<number | null>(null);
-  const source = b.sources.find((s) => s.id === open);
+  const cited = b.sources.filter((s) => fact.source_ids.includes(s.id));
+  const source = cited.find((s) => s.id === open);
   return (
-    <li>
-      {fact.fact}
-      {fact.source_ids.length > 0 ? (
-        fact.source_ids.map((id) => (
+    <li className="space-y-1">
+      <span>
+        {fact.fact}
+        {cited.map((s) => (
           <button
-            key={id}
+            key={s.id}
             type="button"
-            aria-expanded={open === id}
-            onClick={() => setOpen(open === id ? null : id)}
-            className={`${citationClass} ${open === id ? "bg-cite-soft" : ""}`}
+            aria-expanded={open === s.id}
+            onClick={() => setOpen(open === s.id ? null : s.id)}
+            className={`${citationClass} ${open === s.id ? "bg-cite-soft" : ""}`}
           >
-            {id}
+            {s.id}
           </button>
-        ))
-      ) : (
-        <UnsourcedLabel t={t} />
-      )}
+        ))}
+      </span>
+      <span className="flex flex-wrap gap-1.5">
+        <EvidenceLabel level={evidenceLevel(cited)} t={t} />
+        {fact.disputed && (
+          <span className="inline-block rounded-sm border border-warn-ink/40 px-1.5 text-xs font-medium text-warn-ink">
+            {t.disputed}
+          </span>
+        )}
+      </span>
       <AnimatePresence initial={false}>
         {source && (
           <motion.span
@@ -175,11 +186,18 @@ function Fact({ fact, b, t }: { fact: Briefing["key_facts"][number]; b: Briefing
             transition={softSpring}
             className="block overflow-hidden"
           >
-            <span className="mt-2 block border-l-2 border-cite bg-cite-soft/60 px-3 py-2 text-sm">
-              <span className="font-semibold text-cite">{source.id}</span>{" "}
-              <ExternalLink href={source.url}>{source.title}</ExternalLink>
-              {source.publisher && <span className="text-muted"> · {source.publisher}</span>}{" "}
-              <Link href={`${SOURCES_PATH}#${sourceAnchor("b", source.id)}`} className="whitespace-nowrap text-muted underline underline-offset-2">
+            <span className="mt-2 block space-y-2 border-l-2 border-cite bg-cite-soft/60 px-3 py-2.5 text-sm">
+              <span className="block">
+                <span className="font-semibold text-cite">{source.id}</span>{" "}
+                <ExternalLink href={source.url}>{source.title}</ExternalLink>
+                {source.publisher && <span className="text-muted"> · {source.publisher}</span>}
+              </span>
+              <SourceMeta source={source} t={t} />
+              <SourceExcerpt source={source} t={t} />
+              <Link
+                href={`${SOURCES_PATH}#${sourceAnchor("b", source.id)}`}
+                className="inline-block text-xs text-muted underline underline-offset-2"
+              >
                 {t.allSources}
               </Link>
             </span>
@@ -214,8 +232,8 @@ export function OverviewSection() {
         </Section>
       )}
       {b.key_facts.length > 0 && (
-        <Section title={t.keyFacts}>
-          <ol className="list-decimal space-y-2 pl-5 marker:text-muted">
+        <Section title={t.keyFacts} note={t.evidenceNote}>
+          <ol className="list-decimal space-y-3 pl-5 marker:text-muted">
             {b.key_facts.map((fact, i) => (
               <Fact key={i} fact={fact} b={b} t={t} />
             ))}

@@ -1,5 +1,6 @@
 import type { Dictionary } from "@/lib/i18n";
 import type { Source } from "@/lib/schemas";
+import { effectiveSourceType, type EvidenceLevel } from "@/lib/sources";
 import { Stagger, StaggerItem } from "./motion";
 
 // Editorial building blocks: serif headings, hairline rules and whitespace
@@ -65,15 +66,6 @@ export function CitationLink(props: { scope: string; id: number }) {
   );
 }
 
-// A calm marker for a fact no retrieved source supports.
-export function UnsourcedLabel({ t }: { t: Dictionary }) {
-  return (
-    <span className="ml-1.5 inline-block rounded-sm border border-line px-1.5 text-xs text-muted">
-      {t.noSourceForFact}
-    </span>
-  );
-}
-
 // Turns "[1]" markers in plain text into footnotes, without rendering any
 // HTML from the model.
 export function CitedText(props: { text: string; scope: string; validIds: Set<number> }) {
@@ -92,6 +84,48 @@ export function CitedText(props: { text: string; scope: string; validIds: Set<nu
   ));
 }
 
+// Type and date of a source. A type proven by the web address says so;
+// otherwise it is marked as the AI's label.
+export function SourceMeta({ source, t }: { source: Source; t: Dictionary }) {
+  const { type, fromDomain } = effectiveSourceType(source);
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+      <span className="rounded-sm border border-line px-1.5 py-0.5 font-medium text-ink">{t.sourceTypes[type]}</span>
+      <span>{fromDomain ? t.typeFromDomain : t.typeFromAi}</span>
+      {source.published && (
+        <span>
+          · {t.publishedLabel} {source.published}
+        </span>
+      )}
+    </span>
+  );
+}
+
+export function SourceExcerpt({ source, t }: { source: Source; t: Dictionary }) {
+  if (!source.excerpt) return null;
+  return (
+    <figure className="space-y-1">
+      <blockquote className="border-l-2 border-cite pl-3 font-serif text-[0.95em] italic">“{source.excerpt}”</blockquote>
+      <figcaption className="text-xs text-muted">{t.excerptLabel}</figcaption>
+    </figure>
+  );
+}
+
+const evidenceStyles: Record<EvidenceLevel, string> = {
+  primary: "border-accent/40 text-accent",
+  secondary: "border-line text-ink",
+  advocacy: "border-warn-ink/40 text-warn-ink",
+  unsourced: "border-line text-muted",
+};
+
+export function EvidenceLabel({ level, t }: { level: EvidenceLevel; t: Dictionary }) {
+  return (
+    <span className={`inline-block rounded-sm border px-1.5 text-xs font-medium ${evidenceStyles[level]}`}>
+      {t.evidence[level]}
+    </span>
+  );
+}
+
 export function SourceList(props: { sources: Source[]; scope: string; t: Dictionary }) {
   if (props.sources.length === 0) {
     return <p className="border-l-2 border-warn-ink/40 pl-3 text-sm text-warn-ink">{props.t.noSources}</p>;
@@ -99,11 +133,15 @@ export function SourceList(props: { sources: Source[]; scope: string; t: Diction
   return (
     <ol className="divide-y divide-line text-sm">
       {props.sources.map((source) => (
-        <li key={source.id} id={sourceAnchor(props.scope, source.id)} className="flex scroll-mt-24 gap-3 py-2.5">
+        <li key={source.id} id={sourceAnchor(props.scope, source.id)} className="flex scroll-mt-24 gap-3 py-3">
           <span className="w-6 shrink-0 text-right font-semibold text-cite">{source.id}</span>
-          <span>
-            <ExternalLink href={source.url}>{source.title}</ExternalLink>
-            {source.publisher && <span className="text-muted"> · {source.publisher}</span>}
+          <span className="min-w-0 space-y-1.5">
+            <span className="block">
+              <ExternalLink href={source.url}>{source.title}</ExternalLink>
+              {source.publisher && <span className="text-muted"> · {source.publisher}</span>}
+            </span>
+            <SourceMeta source={source} t={props.t} />
+            <SourceExcerpt source={source} t={props.t} />
           </span>
         </li>
       ))}

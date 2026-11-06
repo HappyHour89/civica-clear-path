@@ -3,11 +3,37 @@ import { z } from "zod";
 // One source of truth: these Zod schemas both (1) tell Claude the exact shape to
 // answer in, via toolInputSchema(), and (2) validate what comes back.
 
+export const SOURCE_TYPES = [
+  "government",
+  "court",
+  "academic",
+  "research",
+  "journalism",
+  "advocacy",
+  "reference",
+  "other",
+] as const;
+
+export type SourceType = (typeof SOURCE_TYPES)[number];
+
 export const SourceSchema = z.strictObject({
   id: z.number().int().describe("Short number used to cite this source, starting at 1."),
   title: z.string(),
   url: z.string().describe("Exact URL of a page returned by your web searches."),
   publisher: z.string().describe("Organization that published the page."),
+  source_type: z
+    .enum(SOURCE_TYPES)
+    .describe(
+      "government: official government body; court: court opinion or court system; academic: university or peer-reviewed; research: nonpartisan research group or think tank; journalism: news organization; advocacy: group that campaigns for a position; reference: encyclopedia or explainer; other.",
+    ),
+  published: z
+    .string()
+    .describe("Publication or last-updated date shown on the page (YYYY-MM-DD when possible), or empty if unknown."),
+  excerpt: z
+    .string()
+    .describe(
+      "A short passage from this page, copied word for word from the search result, that supports the facts citing it. Under 300 characters. Empty if you have no exact wording.",
+    ),
 });
 
 export const BriefingSchema = z.strictObject({
@@ -26,6 +52,9 @@ export const BriefingSchema = z.strictObject({
       z.strictObject({
         fact: z.string(),
         source_ids: z.array(z.number().int()).describe("ids from `sources` that support this fact."),
+        disputed: z
+          .boolean()
+          .describe("True if credible sources disagree about this fact itself, not only about what it means."),
       }),
     )
     .describe("Verifiable factual claims, each tied to sources."),

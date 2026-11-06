@@ -5,7 +5,7 @@ import { enforceRateLimit, errorResponse, todayIso } from "@/lib/http";
 import { LANGUAGES } from "@/lib/i18n";
 import { describeRequestContext } from "@/lib/prompts";
 import { BriefingSchema, FollowUpSchema } from "@/lib/schemas";
-import { keepVerifiedSources } from "@/lib/sources";
+import { verifySources } from "@/lib/sources";
 import { isStateCode } from "@/lib/states";
 
 export const maxDuration = 300;
@@ -60,14 +60,14 @@ export async function POST(request: Request) {
       },
     ];
 
-    const { data, searchedUrls } = await research({
+    const { data, searchedUrls, pageAges } = await research({
       messages,
       toolName: "submit_answer",
       toolDescription: "Submit the finished, neutral answer to the user's follow-up question.",
       schema: FollowUpSchema,
       maxSearches: 4,
     });
-    return Response.json({ answer: { ...data, sources: keepVerifiedSources(data.sources, searchedUrls) } });
+    return Response.json({ answer: { ...data, sources: verifySources(data.sources, searchedUrls, pageAges) } });
   } catch (error) {
     return errorResponse(error);
   }

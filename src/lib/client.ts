@@ -68,3 +68,19 @@ export async function joinWaitlist(email: string, language: Language, t: Diction
   });
   await readJson<{ ok: true }>(response, t, language);
 }
+
+export async function startCheckout(
+  input: { plan: "once" } | { plan: "monthly"; amount: number },
+  t: Dictionary,
+  language: Language,
+) {
+  const response = await fetch("/api/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const { url } = await readJson<{ url: string }>(response, t, language);
+  // Only ever send donors to Stripe's own checkout page.
+  if (!url.startsWith("https://checkout.stripe.com/")) throw new Error(t.genericError);
+  return url;
+}

@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import type { Dictionary } from "@/lib/i18n";
 import type { Briefing } from "@/lib/schemas";
+import type { Situation } from "@/lib/situations";
+import { BriefingActions } from "./BriefingActions";
 import { useCivica } from "./CivicaProvider";
 import { FollowUpChat } from "./FollowUpChat";
 import { ProgressBar, softSpring, spring, Stagger, StaggerItem } from "./motion";
@@ -97,6 +99,7 @@ export function BriefingFrame({ children }: { children: React.ReactNode }) {
           {b.title}
         </motion.h1>
         {result.question && <p className="max-w-2xl text-muted">“{result.question}”</p>}
+        <BriefingActions />
         {asking && (
           <p role="status" className="text-sm text-muted">
             {t.briefingInProgress}
@@ -140,22 +143,25 @@ export function BriefingFrame({ children }: { children: React.ReactNode }) {
 
 // Each section renders only inside BriefingFrame, which handles the
 // no-briefing and out-of-scope cases.
-function useBriefing(): { t: Dictionary; b: Briefing; fromDocument: boolean } | null {
+function useBriefing(): { t: Dictionary; b: Briefing; fromDocument: boolean; situations: Situation[] } | null {
   const { t, result } = useCivica();
-  return result?.briefing.in_scope ? { t, b: result.briefing, fromDocument: result.fromDocument } : null;
+  return result?.briefing.in_scope
+    ? { t, b: result.briefing, fromDocument: result.fromDocument, situations: result.situations }
+    : null;
 }
 
-// A key fact with numbered footnotes and labels for the kind of evidence
-// behind it. Clicking a number opens that source inline: type, date, quoted
-// passage, and a link to the full list.
-function Fact({ fact, b, t }: { fact: Briefing["key_facts"][number]; b: Briefing; t: Dictionary }) {
+// A claim with numbered footnotes. Clicking a number opens that source
+// inline: type, date, quoted passage, and a link to the full list. `labels`
+// sit under the text (evidence level, disputed, certainty).
+function Claim(props: { text: string; sourceIds: number[]; b: Briefing; t: Dictionary; labels?: React.ReactNode }) {
+  const { b, t } = props;
   const [open, setOpen] = useState<number | null>(null);
-  const cited = b.sources.filter((s) => fact.source_ids.includes(s.id));
+  const cited = b.sources.filter((s) => props.sourceIds.includes(s.id));
   const source = cited.find((s) => s.id === open);
   return (
-    <li className="space-y-1">
+    <>
       <span>
-        {fact.fact}
+        {props.text}
         {cited.map((s) => (
           <button
             key={s.id}
@@ -168,14 +174,7 @@ function Fact({ fact, b, t }: { fact: Briefing["key_facts"][number]; b: Briefing
           </button>
         ))}
       </span>
-      <span className="flex flex-wrap gap-1.5">
-        <EvidenceLabel level={evidenceLevel(cited)} t={t} />
-        {fact.disputed && (
-          <span className="inline-block rounded-sm border border-warn-ink/40 px-1.5 text-xs font-medium text-warn-ink">
-            {t.disputed}
-          </span>
-        )}
-      </span>
+      {props.labels && <span className="flex flex-wrap gap-1.5">{props.labels}</span>}
       <AnimatePresence initial={false}>
         {source && (
           <motion.span
@@ -204,14 +203,92 @@ function Fact({ fact, b, t }: { fact: Briefing["key_facts"][number]; b: Briefing
           </motion.span>
         )}
       </AnimatePresence>
+    </>
+  );
+}
+
+function Fact({ fact, b, t }: { fact: Briefing["key_facts"][number]; b: Briefing; t: Dictionary }) {
+  const cited = b.sources.filter((s) => fact.source_ids.includes(s.id));
+  return (
+    <li className="space-y-1">
+      <Claim
+        text={fact.fact}
+        sourceIds={fact.source_ids}
+        b={b}
+        t={t}
+        labels={
+          <>
+            <EvidenceLabel level={evidenceLevel(cited)} t={t} />
+            {fact.disputed && (
+              <span className="inline-block rounded-sm border border-warn-ink/40 px-1.5 text-xs font-medium text-warn-ink">
+                {t.disputed}
+              </span>
+            )}
+          </>
+        }
+      />
     </li>
+  );
+}
+
+const certaintyStyles: Record<Briefing["for_you"][number]["certainty"], string> = {
+  clear: "border-accent/40 text-accent",
+  depends: "border-warn-ink/40 text-warn-ink",
+  not_affected: "border-line text-muted",
+};
+
+// "What changes for you": one card per situation the reader picked, or the
+// groups most affected when they picked none.
+function ForYou({ b, t, situations }: { b: Briefing; t: Dictionary; situations: Situation[] }) {
+  if (b.for_you.length === 0) return null;
+  const personal = situations.length > 0;
+  return (
+    <Section title={personal ? t.forYouTitle : t.forYouGeneralTitle}>
+      {personal && (
+        <p className="flex flex-wrap items-center gap-1.5 text-sm text-muted">
+          {t.forYouBasedOn}
+          {situations.map((id) => (
+            <span key={id} className="rounded-sm bg-accent-soft px-1.5 py-0.5 font-medium text-accent">
+              {t.situationLabels[id]}
+            </span>
+          ))}
+        </p>
+      )}
+      <Stagger as="ul" className="grid items-start gap-3 sm:grid-cols-2">
+        {b.for_you.map((item, i) => (
+          <StaggerItem
+            as="li"
+            key={i}
+            className={`space-y-2 rounded-r-md border-l-4 bg-surface px-4 py-3 ${
+              item.certainty === "not_affected" ? "border-line" : "border-accent"
+            }`}
+          >
+            <span className="block font-serif text-lg font-semibold leading-snug">{item.who}</span>
+            <span className="block space-y-1.5">
+              <Claim
+                text={item.what_changes}
+                sourceIds={item.source_ids}
+                b={b}
+                t={t}
+                labels={
+                  <span className={`inline-block rounded-sm border px-1.5 text-xs font-medium ${certaintyStyles[item.certainty]}`}>
+                    {t.certainty[item.certainty]}
+                  </span>
+                }
+              />
+            </span>
+          </StaggerItem>
+        ))}
+      </Stagger>
+      {!personal && <p className="text-sm text-muted">{t.forYouPickHint}</p>}
+    </Section>
   );
 }
 
 export function OverviewSection() {
   const data = useBriefing();
   if (!data) return null;
-  const { t, b, fromDocument } = data;
+  const { t, b, fromDocument, situations } = data;
   // A document gets "what it is / does / could mean for you" framing.
   const labels = fromDocument
     ? { summary: t.docWhatItIs, does: t.docWhatItDoes, matters: t.docMeansForYou }
@@ -221,6 +298,7 @@ export function OverviewSection() {
       <Section title={labels.summary}>
         <p className="font-serif text-xl leading-relaxed">{b.summary}</p>
       </Section>
+      <ForYou b={b} t={t} situations={situations} />
       {b.what_it_does.length > 0 && (
         <Section title={labels.does}>
           <BulletList items={b.what_it_does} />

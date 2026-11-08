@@ -5,11 +5,18 @@ import { askQuestion, fetchOfficials, type ChatTurn } from "@/lib/client";
 import { DICTIONARIES, isLanguage, type Dictionary, type Language } from "@/lib/i18n";
 import type { OfficialsResult } from "@/lib/officials";
 import type { Briefing } from "@/lib/schemas";
+import { parseSituations, type Situation } from "@/lib/situations";
 import { isStateCode } from "@/lib/states";
 
 export type AskInput = { question: string; file: File | null };
 
-export type BriefingResult = { question: string; state: string; briefing: Briefing; fromDocument: boolean };
+export type BriefingResult = {
+  question: string;
+  state: string;
+  situations: Situation[];
+  briefing: Briefing;
+  fromDocument: boolean;
+};
 
 export type OfficialsState = { state: string; officials: OfficialsResult | null; error: boolean };
 
@@ -20,6 +27,9 @@ type CivicaContextValue = {
   // The user's state is remembered in this browser; the street address is not.
   state: string;
   setState: (state: string) => void;
+  // Situations for "what changes for you", also remembered in this browser.
+  situations: Situation[];
+  setSituations: (situations: Situation[]) => void;
   officials: OfficialsState | null;
   lookUpOfficials: (state: string, address: string) => Promise<void>;
   officialsLoading: boolean;
@@ -36,6 +46,7 @@ const CivicaContext = createContext<CivicaContextValue | null>(null);
 
 const LANGUAGE_KEY = "civica.language";
 const STATE_KEY = "civica.state";
+const SITUATIONS_KEY = "civica.situations";
 
 function readStored(key: string) {
   try {
@@ -57,6 +68,7 @@ function writeStored(key: string, value: string) {
 export function CivicaProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>("en");
   const [state, setStateValue] = useState("");
+  const [situations, setSituationsValue] = useState<Situation[]>([]);
   const [officials, setOfficials] = useState<OfficialsState | null>(null);
   const [officialsLoading, setOfficialsLoading] = useState(false);
   const [result, setResult] = useState<BriefingResult | null>(null);
@@ -72,6 +84,7 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore from storage
     if (isLanguage(storedLanguage)) setLanguageState(storedLanguage);
     if (isStateCode(storedState)) setStateValue(storedState);
+    setSituationsValue(parseSituations(readStored(SITUATIONS_KEY)));
   }, []);
 
   // Lets screen readers and browsers pick the right pronunciation and fonts.
@@ -87,6 +100,11 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
   const setState = useCallback((next: string) => {
     setStateValue(next);
     writeStored(STATE_KEY, next);
+  }, []);
+
+  const setSituations = useCallback((next: Situation[]) => {
+    setSituationsValue(next);
+    writeStored(SITUATIONS_KEY, next.join(","));
   }, []);
 
   const lookUpOfficials = useCallback(
@@ -113,10 +131,10 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
         state && officials?.state !== state ? lookUpOfficials(state, "") : Promise.resolve();
       try {
         const [briefing] = await Promise.all([
-          askQuestion({ question: input.question, file: input.file, language, state }, t),
+          askQuestion({ question: input.question, file: input.file, language, state, situations }, t),
           officialsRequest,
         ]);
-        setResult({ question: input.question, state, briefing, fromDocument: input.file !== null });
+        setResult({ question: input.question, state, situations, briefing, fromDocument: input.file !== null });
         setTurns([]);
         return true;
       } catch (e) {
@@ -126,7 +144,7 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
         setAsking(false);
       }
     },
-    [state, officials, lookUpOfficials, language, t],
+    [state, situations, officials, lookUpOfficials, language, t],
   );
 
   const value = useMemo(
@@ -136,6 +154,8 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
       t,
       state,
       setState,
+      situations,
+      setSituations,
       officials,
       lookUpOfficials,
       officialsLoading,
@@ -146,7 +166,7 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
       turns,
       setTurns,
     }),
-    [language, setLanguage, t, state, setState, officials, lookUpOfficials, officialsLoading, result, asking, askError, ask, turns],
+    [language, setLanguage, t, state, setState, situations, setSituations, officials, lookUpOfficials, officialsLoading, result, asking, askError, ask, turns],
   );
 
   return <CivicaContext value={value}>{children}</CivicaContext>;

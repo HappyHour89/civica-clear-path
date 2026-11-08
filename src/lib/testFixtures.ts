@@ -5,6 +5,15 @@ export const sampleBriefing: Briefing = {
   out_of_scope_message: "",
   title: "The Senate filibuster",
   summary: "The filibuster is a Senate practice that lets a minority of senators delay or block most bills.",
+  for_you: [
+    {
+      situation: "",
+      who: "If you contact your senators",
+      what_changes: "A bill your senators support can still stall without 60 votes.",
+      certainty: "clear",
+      source_ids: [1, 2],
+    },
+  ],
   what_it_does: ["Requires 60 votes to end debate on most legislation."],
   why_it_matters: ["It shapes which bills can pass with a narrow majority."],
   key_facts: [

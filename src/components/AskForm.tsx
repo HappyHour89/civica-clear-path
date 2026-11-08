@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { SITUATIONS, type Situation } from "@/lib/situations";
 import { US_STATES } from "@/lib/states";
 import { useCivica, type AskInput } from "./CivicaProvider";
 import { Button, Collapse, ProgressBar, Reveal, Stagger, StaggerItem } from "./motion";
@@ -41,6 +42,48 @@ function LocalContextNote() {
         </>
       )}
     </p>
+  );
+}
+
+// Optional situations, so the answer says what changes for someone like you.
+function SituationPicker() {
+  const { t, situations, setSituations, asking } = useCivica();
+  const toggle = (id: Situation) =>
+    setSituations(situations.includes(id) ? situations.filter((s) => s !== id) : [...situations, id]);
+  return (
+    <fieldset className="space-y-2">
+      <legend className="flex w-full flex-wrap items-baseline justify-between gap-2 font-semibold">
+        {t.personalTitle}
+        {situations.length > 0 && (
+          <span className="text-sm font-normal text-muted">
+            {situations.length} {t.personalSelected} ·{" "}
+            <button type="button" onClick={() => setSituations([])} className="text-accent underline underline-offset-2">
+              {t.personalClear}
+            </button>
+          </span>
+        )}
+      </legend>
+      <p className="text-sm text-muted">{t.personalHint}</p>
+      <div className="flex flex-wrap gap-2">
+        {(Object.keys(SITUATIONS) as Situation[]).map((id) => {
+          const on = situations.includes(id);
+          return (
+            <Button
+              key={id}
+              type="button"
+              variant="chip"
+              aria-pressed={on}
+              disabled={asking}
+              onClick={() => toggle(id)}
+              className={on ? "border-accent! bg-accent-soft! text-accent!" : ""}
+            >
+              {on && <span aria-hidden>✓ </span>}
+              {t.situationLabels[id]}
+            </Button>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }
 
@@ -117,6 +160,14 @@ export function QuestionForm() {
   const [question, setQuestion] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
 
+  // A shared briefing links to /?q=…, which fills in the question. It is not
+  // sent until the reader presses the button.
+  useEffect(() => {
+    const shared = new URLSearchParams(window.location.search).get("q");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of the shared link
+    if (shared) setQuestion(shared.slice(0, 2000));
+  }, []);
+
   return (
     <div className="space-y-10">
       <PageIntro title={t.navAsk} intro={t.intro} />
@@ -153,6 +204,7 @@ export function QuestionForm() {
             ))}
           </div>
         </div>
+        <SituationPicker />
         <LocalContextNote />
         <ErrorMessage message={localError ?? (askError?.fromDocument === false ? askError.message : null)} />
         <SubmitRow />
@@ -245,6 +297,7 @@ export function DocumentForm() {
             className={inputClass}
           />
         </div>
+        <SituationPicker />
         <LocalContextNote />
         <ErrorMessage message={localError ?? (askError?.fromDocument ? askError.message : null)} />
         <SubmitRow />

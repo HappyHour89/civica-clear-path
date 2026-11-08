@@ -233,15 +233,36 @@ describe("research", () => {
     expect(error.message).not.toMatch(/credit/i);
   });
 
-  it("does not retry Claude after a 400", async () => {
+  it("retries Claude once with a plain request after a 400, then keeps using it", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const spy = vi
       .spyOn(Messages.prototype, "create")
-      .mockRejectedValueOnce(new Anthropic.BadRequestError(400, undefined, "bad", new Headers()));
+      .mockRejectedValueOnce(new Anthropic.BadRequestError(400, undefined, "bad", new Headers()))
+      .mockResolvedValueOnce({ stop_reason: "tool_use", content: [toolCall("t", followUp)] } as never)
+      .mockResolvedValueOnce({ stop_reason: "tool_use", content: [toolCall("t", followUp)] } as never);
+    const options = { messages: [], toolName: "t", toolDescription: "d", schema: FollowUpSchema, maxSearches: 1 };
+    await expect(research(options)).resolves.toMatchObject({ data: followUp });
+    const retry = spy.mock.calls[1][0] as unknown as Record<string, unknown>;
+    expect(retry).not.toHaveProperty("betas");
+    expect(retry).not.toHaveProperty("output_config");
+    const tools = retry.tools as { name: string; strict?: boolean }[];
+    expect(tools.map((tool) => tool.name)).toEqual(["web_search", "t"]);
+    expect(tools[1]).not.toHaveProperty("strict");
+
+    await research(options);
+    expect(spy).toHaveBeenCalledTimes(3);
+    expect(spy.mock.calls[2][0]).not.toHaveProperty("betas");
+  });
+
+  it("gives up after the plain request is rejected too", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const spy = vi
+      .spyOn(Messages.prototype, "create")
+      .mockRejectedValue(new Anthropic.BadRequestError(400, undefined, "bad", new Headers()));
     await expect(
       research({ messages: [], toolName: "t", toolDescription: "d", schema: FollowUpSchema, maxSearches: 1 }),
     ).rejects.toMatchObject({ status: 400 });
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 
   it("uses Meta mode for the Claude Code-style ANTHROPIC_BASE_URL setup", async () => {
@@ -361,6 +382,7 @@ describe("research", () => {
 
 describe("POST /api/ask", () => {
   beforeEach(() => {
+    resetProviderStateForTests();
     process.env.ANTHROPIC_API_KEY = "test-key";
   });
   afterEach(() => {
@@ -429,10 +451,10 @@ describe("POST /api/ask", () => {
   it("does not expose the AI provider's reason in error responses", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const body = { type: "error", error: { type: "invalid_request_error", message: "max_tokens too large" } };
-    vi.spyOn(Messages.prototype, "create").mockRejectedValueOnce(
+    vi.spyOn(Messages.prototype, "create").mockRejectedValue(
       new Anthropic.BadRequestError(400, body, "400 raw", new Headers()),
     );
-    const response = await askRoute(askRequest({ question: "q", language: "en" }, "10.0.0.9"));
+    const response = await askRoute(askRequest({ question: "q", language: "en" }, "10.0.0.10"));
     expect(response.status).toBe(400);
     expect(JSON.stringify(await response.json())).not.toContain("max_tokens");
   });

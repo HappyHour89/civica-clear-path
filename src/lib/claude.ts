@@ -94,12 +94,17 @@ type ResearchResult<T> = { data: T; searchedUrls: Set<string>; pageAges: Map<str
 // steps down to a simpler form: first without web search, strict tools or
 // prompt caching, then with no tools at all (the answer comes back as JSON
 // text). The accepted form is remembered for later requests.
-type Level = "full" | "basic-tools" | "json-text";
+// "compat" is Claude's fallback: web search and the tool stay, but without
+// strict schema mode, beta features or effort settings, any of which an API
+// change can start rejecting.
+type Level = "full" | "compat" | "basic-tools" | "json-text";
 const META_LEVELS: Level[] = ["full", "basic-tools", "json-text"];
 let metaLevel = 0;
+let claudeCompat = false;
 
 export function resetProviderStateForTests() {
   metaLevel = 0;
+  claudeCompat = false;
   cached = null;
 }
 
@@ -107,8 +112,19 @@ export async function research<T>(options: ResearchOptions<T>): Promise<Research
   const provider = getProvider();
   const client = getClient(provider);
   if (provider.name !== "meta") {
+    if (!claudeCompat) {
+      try {
+        return await researchWithTools(client, provider, options, "full");
+      } catch (error) {
+        if (!(error instanceof Anthropic.BadRequestError) || isBillingError(error)) throw toCivicaError(error);
+        // Logged so the cause shows up in the server logs (Vercel > Logs).
+        console.error("Claude rejected the full request; retrying without strict mode or betas.", providerMessage(error));
+      }
+    }
     try {
-      return await researchWithTools(client, provider, options, "full");
+      const result = await researchWithTools(client, provider, options, "compat");
+      claudeCompat = true;
+      return result;
     } catch (error) {
       throw toCivicaError(error);
     }
@@ -252,6 +268,8 @@ function buildRequest(
   level: Exclude<Level, "json-text">,
 ): Anthropic.Beta.MessageCreateParamsNonStreaming {
   const full = level === "full";
+  // Claude keeps web search and its larger output in compat mode.
+  const searching = full || level === "compat";
   const tools: Anthropic.Beta.BetaToolUnion[] = [
     {
       name: options.toolName,
@@ -260,7 +278,7 @@ function buildRequest(
       input_schema: toolInputSchema(options.schema),
     },
   ];
-  if (provider.webSearch && full) {
+  if (provider.webSearch && searching) {
     // The plain search tool: the 20260209 version expects a code-execution
     // tool alongside it, and without one its searches fail and burn max_uses.
     tools.unshift({ type: "web_search_20250305", name: "web_search", max_uses: options.maxSearches });
@@ -268,15 +286,15 @@ function buildRequest(
   return {
     model: provider.model,
     // Some compatible APIs cap output lower than Claude does.
-    max_tokens: full ? 16000 : 8192,
-    ...(provider.anthropicExtras && {
+    max_tokens: searching ? 16000 : 8192,
+    ...(provider.anthropicExtras && full && {
       // If a safety classifier declines, the API retries on its recommended
       // fallback model inside the same call instead of failing outright.
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       output_config: { effort: "medium" },
     }),
-    system: full ? [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }] : SYSTEM_PROMPT,
+    system: searching ? [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }] : SYSTEM_PROMPT,
     tools,
     tool_choice: { type: "auto" },
     messages: options.messages,
@@ -288,6 +306,10 @@ function providerMessage(error: InstanceType<typeof Anthropic.APIError>) {
   const body = error.error as { error?: { message?: unknown }; message?: unknown } | undefined;
   const message = body?.error?.message ?? body?.message ?? error.message;
   return String(message).slice(0, 300);
+}
+
+function isBillingError(error: InstanceType<typeof Anthropic.APIError>) {
+  return /credit balance|billing|quota/i.test(providerMessage(error));
 }
 
 function toCivicaError(error: unknown): CivicaError {
@@ -303,7 +325,7 @@ function toCivicaError(error: unknown): CivicaError {
     // Logged in full for the operator; users only see a friendly message.
     const reason = providerMessage(error);
     console.error("AI provider rejected the request", reason);
-    if (/credit balance|billing|quota/i.test(reason)) {
+    if (isBillingError(error)) {
       return new CivicaError("Civica's AI service is temporarily unavailable. Please try again later.", 503);
     }
     return new CivicaError("The AI service couldn't process this request. Please try again or rephrase it.", 400);

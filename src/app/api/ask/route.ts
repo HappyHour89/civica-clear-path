@@ -4,6 +4,7 @@ import { enforceRateLimit, errorResponse, todayIso } from "@/lib/http";
 import { isLanguage } from "@/lib/i18n";
 import { describeRequestContext } from "@/lib/prompts";
 import { BriefingSchema } from "@/lib/schemas";
+import { parseSituations } from "@/lib/situations";
 import { isSafeHttpUrl, verifySources } from "@/lib/sources";
 import { isStateCode } from "@/lib/states";
 import { fileToContentBlock } from "@/lib/upload";
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
     const language = form.get("language");
     const state = form.get("state");
     const file = form.get("file");
+    const situations = parseSituations(form.get("situations"));
 
     if (!isLanguage(language)) throw new CivicaError("Unsupported language.", 400);
     if (question.length > MAX_QUESTION_CHARS) {
@@ -39,7 +41,7 @@ export async function POST(request: Request) {
     content.push({
       type: "text",
       text: [
-        describeRequestContext({ language, state: isStateCode(state) ? state : null, today: todayIso() }),
+        describeRequestContext({ language, state: isStateCode(state) ? state : null, today: todayIso(), situations }),
         hasFile ? "The user uploaded the document above. Explain what it is and what it means for them." : "",
         `<user_question>\n${question || "Please explain this document."}\n</user_question>`,
       ]
@@ -69,6 +71,10 @@ export async function POST(request: Request) {
       key_facts: data.key_facts.map((fact) => ({
         ...fact,
         source_ids: fact.source_ids.filter((id) => sourceIds.has(id)),
+      })),
+      for_you: data.for_you.map((item) => ({
+        ...item,
+        source_ids: item.source_ids.filter((id) => sourceIds.has(id)),
       })),
       helpful_websites: data.helpful_websites.filter((site) => isSafeHttpUrl(site.url)),
     };

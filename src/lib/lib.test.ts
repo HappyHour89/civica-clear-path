@@ -13,6 +13,8 @@ import {
   normalizeUrl,
   verifySources,
 } from "./sources";
+import { parseSituations } from "./situations";
+import { describeRequestContext } from "./prompts";
 import { sampleBriefing } from "./testFixtures";
 import { fileToContentBlock } from "./upload";
 
@@ -237,5 +239,17 @@ describe("source transparency", () => {
     expect(absoluteDate("1 day ago", now)).toBe("2026-11-05");
     expect(absoluteDate("4 months ago", now)).toBe("4 months ago");
     expect(absoluteDate("March 3, 2026", now)).toBe("March 3, 2026");
+  });
+});
+
+describe("situations", () => {
+  it("keeps known situations once each, in order", () => {
+    expect(parseSituations("student, renter,student,toString,hasOwnProperty")).toEqual(["student", "renter"]);
+    expect(parseSituations(null)).toEqual([]);
+  });
+
+  it("says when the reader gave none", () => {
+    const context = describeRequestContext({ language: "en", state: null, today: "2026-11-08" });
+    expect(context).toContain("Reader's situations: not provided");
   });
 });

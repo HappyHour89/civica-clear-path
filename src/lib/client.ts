@@ -16,13 +16,14 @@ async function readJson<T>(response: Response, t: Dictionary, language: Language
 }
 
 export async function askQuestion(
-  input: { question: string; file: File | null; language: Language; state: string },
+  input: { question: string; file: File | null; language: Language; state: string; situations: string[] },
   t: Dictionary,
 ) {
   const form = new FormData();
   form.set("question", input.question);
   form.set("language", input.language);
   form.set("state", input.state);
+  if (input.situations.length) form.set("situations", input.situations.join(","));
   if (input.file) form.set("file", input.file);
   const response = await fetch("/api/ask", { method: "POST", body: form });
   return (await readJson<{ briefing: Briefing }>(response, t, input.language)).briefing;

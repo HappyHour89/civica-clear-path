@@ -403,6 +403,29 @@ describe("POST /api/ask", () => {
     expect(prompt).toContain("<user_question>\nWhat is the filibuster?\n</user_question>");
   });
 
+  it("tells the model the reader's situations and keeps only verified citations", async () => {
+    const spy = mockResponses({
+      stop_reason: "tool_use",
+      content: [
+        searchResult("https://www.senate.gov/about/powers-procedures/filibusters-cloture.htm"),
+        toolCall("submit_briefing", sampleBriefing),
+      ],
+    });
+    const response = await askRoute(
+      askRequest(
+        { question: "What is the filibuster?", language: "en", state: "", situations: "renter,bogus,parent,renter" },
+        "10.0.0.9",
+      ),
+    );
+    const { briefing } = await response.json();
+    expect(briefing.for_you[0].source_ids).toEqual([1]);
+
+    const params = spy.mock.calls[0][0] as unknown as { messages: { content: { type: string; text?: string }[] }[] };
+    const prompt = params.messages[0].content.at(-1)?.text ?? "";
+    expect(prompt).toContain("Reader's situations: renter (rents their home); parent (is a parent or caregiver)");
+    expect(prompt).not.toContain("bogus");
+  });
+
   it("does not expose the AI provider's reason in error responses", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const body = { type: "error", error: { type: "invalid_request_error", message: "max_tokens too large" } };

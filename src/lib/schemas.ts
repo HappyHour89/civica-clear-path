@@ -45,6 +45,21 @@ export const BriefingSchema = z.strictObject({
     .describe("If in_scope is false, a short polite note explaining what Civica can help with. Otherwise empty."),
   title: z.string().describe("Short neutral title for the topic."),
   summary: z.string().describe("2-4 sentence plain-language explanation a 9th grader could follow."),
+  for_you: z
+    .array(
+      z.strictObject({
+        situation: z
+          .string()
+          .describe("The reader's situation id this item is about (e.g. 'renter'), or empty when no situations were given."),
+        who: z.string().describe("Short label for who this is about, e.g. 'If you rent your home'."),
+        what_changes: z.string().describe("One or two plain sentences on what concretely changes for them."),
+        certainty: z
+          .enum(["clear", "depends", "not_affected"])
+          .describe("clear: the sources say so directly; depends: it turns on details or pending decisions; not_affected: no direct change."),
+        source_ids: z.array(z.number().int()).describe("ids from `sources` that support this item."),
+      }),
+    )
+    .describe("What changes for the reader, or for the groups most affected. See the system prompt."),
   what_it_does: z.array(z.string()).describe("Concrete things the policy, law, institution, or event actually does."),
   why_it_matters: z.array(z.string()).describe("Who is affected and how, stated factually."),
   key_facts: z

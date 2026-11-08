@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { LANGUAGES, type Dictionary, type Language } from "@/lib/i18n";
 import { useCivica } from "./CivicaProvider";
+import { Intro } from "./Intro";
 import { softSpring, spring } from "./motion";
 
 function navItems(t: Dictionary) {
@@ -29,6 +30,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const { t, language, setLanguage, result, asking } = useCivica();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  // The opening animation plays when a visit starts on the home page, not
+  // every time someone navigates back to it.
+  const [introActive, setIntroActive] = useState(pathname === "/");
+  if (introActive && pathname !== "/") setIntroActive(false);
   // "Your briefing" appears once there is one, or one is being researched.
   const items = navItems(t).filter((item) => item.href !== "/briefing" || asking || result);
 
@@ -76,6 +81,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   return (
     <MotionConfig reducedMotion="user">
       <div className="flex flex-1 flex-col">
+        {introActive && <Intro />}
         <header className="sticky top-0 z-20 border-t-4 border-b border-t-accent border-b-line bg-canvas/95 backdrop-blur">
           <div className="mx-auto flex max-w-5xl flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 pt-4 pb-2 sm:px-6">
             <Link href="/" className="text-left">

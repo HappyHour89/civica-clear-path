@@ -11,6 +11,8 @@ export function isLanguage(value: unknown): value is Language {
 
 const en = {
   tagline: "Know what it says. Decide what you think.",
+  introLegalese: "Notwithstanding the foregoing provisions hereof…",
+  introScroll: "Scroll to begin",
   intro:
     "Ask about any law, court case, policy, or political fight. You'll get a plain-language explanation, the strongest case each side makes, and sources for the key facts.",
   questionLabel: "Your question",
@@ -206,6 +208,8 @@ export type Dictionary = typeof en;
 
 const ko: Dictionary = {
   tagline: "무슨 내용인지 알고, 판단은 스스로.",
+  introLegalese: "전항의 규정에도 불구하고 갑은…",
+  introScroll: "스크롤해서 시작하기",
   intro:
     "법률, 재판, 정책, 정치적 논쟁 등 무엇이든 질문하세요. 쉬운 말로 된 설명과 각 입장의 가장 강력한 논거, 그리고 핵심 사실의 출처를 보여 드립니다.",
   questionLabel: "질문",

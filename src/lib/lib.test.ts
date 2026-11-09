@@ -14,6 +14,7 @@ import {
   verifySources,
 } from "./sources";
 import { parseSituations } from "./situations";
+import { wrapText } from "./shareCard";
 import { describeRequestContext } from "./prompts";
 import { sampleBriefing } from "./testFixtures";
 import { fileToContentBlock } from "./upload";
@@ -251,5 +252,20 @@ describe("situations", () => {
   it("says when the reader gave none", () => {
     const context = describeRequestContext({ language: "en", state: null, today: "2026-11-08" });
     expect(context).toContain("Reader's situations: not provided");
+  });
+});
+
+describe("share card text", () => {
+  const measure = (s: string) => s.length * 10;
+
+  it("wraps by words and ends with an ellipsis when it runs long", () => {
+    expect(wrapText(measure, "one two three four", 90, 3)).toEqual(["one two", "three", "four"]);
+    const lines = wrapText(measure, "one two three four five six", 90, 2);
+    expect(lines).toHaveLength(2);
+    expect(lines[1].endsWith("…")).toBe(true);
+  });
+
+  it("breaks words longer than a line by character", () => {
+    expect(wrapText(measure, "가나다라마바사", 30, 5)).toEqual(["가나다", "라마바", "사"]);
   });
 });

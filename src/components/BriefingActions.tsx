@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Language } from "@/lib/i18n";
 import type { Briefing } from "@/lib/schemas";
+import { drawShareCard } from "@/lib/shareCard";
 import { useCivica } from "./CivicaProvider";
 import { Button, softSpring } from "./motion";
 
@@ -83,6 +84,16 @@ function SpeakerIcon({ speaking }: { speaking: boolean }) {
   );
 }
 
+function ImageIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
+      <rect x="3" y="3.5" width="14" height="13" rx="2" />
+      <path d="M3.5 13.5l4-4 3 3 2-2 4 4" strokeLinejoin="round" />
+      <circle cx="13" cy="7.5" r="1.3" />
+    </svg>
+  );
+}
+
 function ShareIcon() {
   return (
     <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
@@ -97,6 +108,7 @@ export function BriefingActions() {
   const speechSupported = useSyncExternalStore(noSubscribe, canSpeak, () => false);
   const { speaking, speak, stop } = useSpeech(language);
   const [copied, setCopied] = useState(false);
+  const [making, setMaking] = useState(false);
 
   // A new briefing or language stops whatever is being read.
   const briefing = result?.briefing;
@@ -129,6 +141,39 @@ export function BriefingActions() {
     }
   }
 
+  // An image of the briefing for social posts and group chats. Shared as a
+  // file where the device allows it, otherwise downloaded.
+  async function shareCard() {
+    if (!result || !briefing) return;
+    setMaking(true);
+    try {
+      const blob = await drawShareCard(briefing, {
+        eyebrow: result.fromDocument ? t.documentEyebrow : t.briefingEyebrow,
+        forYou: result.situations.length ? t.forYouTitle : t.forYouGeneralTitle,
+        tagline: t.tagline,
+        site: window.location.host,
+      });
+      const name = `civica-${briefing.title.toLowerCase().replace(/[^a-z0-9가-힣]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "briefing"}.png`;
+      const file = new File([blob], name, { type: "image/png" });
+      if (navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: `${briefing.title} · Civica` });
+        } catch {
+          // Closed the share sheet.
+        }
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } finally {
+      setMaking(false);
+    }
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2 pt-1">
       {speechSupported && (
@@ -158,6 +203,10 @@ export function BriefingActions() {
       <Button type="button" variant="soft" onClick={share}>
         <ShareIcon />
         {t.share}
+      </Button>
+      <Button type="button" variant="soft" onClick={shareCard} disabled={making}>
+        <ImageIcon />
+        {making ? t.cardMaking : t.shareCard}
       </Button>
       <AnimatePresence>
         {copied && (

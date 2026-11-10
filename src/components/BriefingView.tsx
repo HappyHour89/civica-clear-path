@@ -237,6 +237,51 @@ const certaintyStyles: Record<Briefing["for_you"][number]["certainty"], string> 
   not_affected: "border-line text-muted",
 };
 
+const watchIcons: Record<Briefing["watch_outs"][number]["kind"], React.ReactNode> = {
+  deadline: <path d="M10 5.5V10l3 2M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />,
+  money: <path d="M10 3v14M13.5 6.5c-.6-1-1.9-1.5-3.5-1.5-2 0-3.5 1-3.5 2.5S8 9.7 10 10s3.5 1 3.5 2.5S12 15 10 15c-1.6 0-3-.6-3.6-1.7" />,
+  rights: <path d="M10 3l6 2.5v4.2c0 3.6-2.5 6.3-6 7.3-3.5-1-6-3.7-6-7.3V5.5z" />,
+  automatic: <path d="M15.5 8A6 6 0 004.6 6.5M4.5 12a6 6 0 0010.9 1.5M4.5 3.5v3h3M15.5 16.5v-3h-3" />,
+  penalty: <path d="M10 3.5l7 12.5H3zM10 8.5v3.5M10 14.2v.3" />,
+  other: <path d="M10 9v5M10 6v.3M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />,
+};
+
+// "Worth a second look": clauses in an uploaded document a careful reader
+// would double-check, each quoted word for word.
+function WatchOuts({ b, t }: { b: Briefing; t: Dictionary }) {
+  if (b.watch_outs.length === 0) return null;
+  return (
+    <Section title={t.watchTitle} note={t.watchNote}>
+      <Stagger as="ol" className="space-y-3">
+        {b.watch_outs.map((item, i) => (
+          <StaggerItem as="li" key={i} className="grid grid-cols-[2.5rem_1fr] gap-3 rounded-lg border border-line bg-surface p-4">
+            <span className="grid size-10 place-items-center rounded-full bg-warn-soft text-warn-ink">
+              <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                {watchIcons[item.kind]}
+              </svg>
+            </span>
+            <span className="min-w-0 space-y-1.5">
+              <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-warn-ink [:lang(ko)_&]:tracking-normal">
+                {t.watchKinds[item.kind]}
+              </span>
+              <span className="block font-serif text-lg font-semibold leading-snug">{item.title}</span>
+              <span className="block">{item.explanation}</span>
+              {item.quote && (
+                <figure className="space-y-1 pt-1">
+                  <blockquote className="border-l-2 border-warn-ink/40 pl-3 font-serif text-[0.95em] italic text-muted">
+                    “{item.quote}”
+                  </blockquote>
+                  <figcaption className="text-xs text-muted">{t.watchQuote}</figcaption>
+                </figure>
+              )}
+            </span>
+          </StaggerItem>
+        ))}
+      </Stagger>
+    </Section>
+  );
+}
+
 // "What changes for you": one card per situation the reader picked, or the
 // groups most affected when they picked none.
 function ForYou({ b, t, situations }: { b: Briefing; t: Dictionary; situations: Situation[] }) {
@@ -299,6 +344,7 @@ export function OverviewSection() {
         <p className="font-serif text-xl leading-relaxed">{b.summary}</p>
       </Section>
       <ForYou b={b} t={t} situations={situations} />
+      {fromDocument && <WatchOuts b={b} t={t} />}
       {b.what_it_does.length > 0 && (
         <Section title={labels.does}>
           <BulletList items={b.what_it_does} />

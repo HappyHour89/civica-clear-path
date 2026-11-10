@@ -60,6 +60,22 @@ export const BriefingSchema = z.strictObject({
       }),
     )
     .describe("What changes for the reader, or for the groups most affected. See the system prompt."),
+  watch_outs: z
+    .array(
+      z.strictObject({
+        kind: z
+          .enum(["deadline", "money", "rights", "automatic", "penalty", "other"])
+          .describe(
+            "deadline: a date or time limit; money: fees, costs, or payments; rights: rights given up or limited (e.g. arbitration, waivers); automatic: something that renews or happens unless you act; penalty: consequences for missing or breaking something; other.",
+          ),
+        title: z.string().describe("A few plain words naming the clause, e.g. 'Rent goes up automatically'."),
+        explanation: z.string().describe("One or two plain sentences on what it means for the reader in practice."),
+        quote: z
+          .string()
+          .describe("The clause's exact wording from the uploaded document, under 250 characters. Empty if not quotable."),
+      }),
+    )
+    .describe("Uploaded documents only: clauses worth a second look. Empty for questions without a document."),
   what_it_does: z.array(z.string()).describe("Concrete things the policy, law, institution, or event actually does."),
   why_it_matters: z.array(z.string()).describe("Who is affected and how, stated factually."),
   key_facts: z

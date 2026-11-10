@@ -14,6 +14,7 @@ export const sampleBriefing: Briefing = {
       source_ids: [1, 2],
     },
   ],
+  watch_outs: [],
   what_it_does: ["Requires 60 votes to end debate on most legislation."],
   why_it_matters: ["It shapes which bills can pass with a narrow majority."],
   key_facts: [

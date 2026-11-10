@@ -131,3 +131,27 @@ export function PageTransition({
     </motion.div>
   );
 }
+
+// Sections that rise into place the first time they scroll into view.
+export function InView({
+  as = "div",
+  className,
+  children,
+}: {
+  as?: "div" | "section";
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const Component = motion[as];
+  return (
+    <Component
+      className={className}
+      initial={{ opacity: 0, y: 18 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.12 }}
+      transition={softSpring}
+    >
+      {children}
+    </Component>
+  );
+}

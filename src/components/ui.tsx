@@ -1,20 +1,20 @@
 import type { Dictionary } from "@/lib/i18n";
 import type { Source } from "@/lib/schemas";
 import { effectiveSourceType, type EvidenceLevel } from "@/lib/sources";
-import { Stagger, StaggerItem } from "./motion";
+import { InView, Stagger, StaggerItem } from "./motion";
 
 // Editorial building blocks: serif headings, hairline rules and whitespace
 // instead of boxing every section in a card.
 
 export function Section(props: { title: string; children: React.ReactNode; note?: string }) {
   return (
-    <section className="space-y-3 border-t border-line pt-6 first:border-t-0 first:pt-0">
+    <InView as="section" className="space-y-3 border-t border-line pt-6 first:border-t-0 first:pt-0">
       <div className="space-y-1">
         <h2 className="font-serif text-2xl font-semibold tracking-tight">{props.title}</h2>
         {props.note && <p className="text-sm text-muted">{props.note}</p>}
       </div>
       {props.children}
-    </section>
+    </InView>
   );
 }
 

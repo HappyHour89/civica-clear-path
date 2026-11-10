@@ -20,6 +20,7 @@ function readableText(b: Briefing) {
     b.title,
     b.summary,
     ...b.for_you.map((item) => `${item.who}. ${item.what_changes}`),
+    ...b.watch_outs.map((item) => `${item.title}. ${item.explanation}`),
     ...b.what_it_does,
     ...b.why_it_matters,
   ];

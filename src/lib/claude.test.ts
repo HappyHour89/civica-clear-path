@@ -478,6 +478,20 @@ describe("POST /api/ask", () => {
     expect(params.messages[0].content[0]).toMatchObject({ type: "document", title: "bill.pdf" });
   });
 
+  it("keeps clauses worth a second look only for uploaded documents", async () => {
+    const watch = { kind: "automatic", title: "Renews every year", explanation: "Unless you cancel.", quote: "shall renew" };
+    const withWatch = { ...sampleBriefing, watch_outs: [watch] };
+    mockResponses(
+      { stop_reason: "tool_use", content: [toolCall("submit_briefing", withWatch)] },
+      { stop_reason: "tool_use", content: [toolCall("submit_briefing", withWatch)] },
+    );
+    const pdf = new File(["%PDF-1.7 fake"], "lease.pdf", { type: "application/pdf" });
+    const fromDoc = await askRoute(askRequest({ question: "", language: "en", file: pdf }, "10.0.0.11"));
+    expect((await fromDoc.json()).briefing.watch_outs).toEqual([watch]);
+    const fromQuestion = await askRoute(askRequest({ question: "What is a lease?", language: "en" }, "10.0.0.12"));
+    expect((await fromQuestion.json()).briefing.watch_outs).toEqual([]);
+  });
+
   it("rate limits repeated requests from the same visitor", async () => {
     vi.spyOn(Messages.prototype, "create").mockResolvedValue({
       stop_reason: "tool_use",

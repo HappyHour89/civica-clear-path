@@ -1,13 +1,13 @@
 "use client";
 
-import { AnimatePresence, LayoutGroup, MotionConfig, motion, useMotionValueEvent, useScroll } from "motion/react";
+import { AnimatePresence, MotionConfig, motion, useMotionValueEvent, useScroll } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LANGUAGES, type Dictionary, type Language } from "@/lib/i18n";
 import { useCivica } from "./CivicaProvider";
 import { Intro } from "./Intro";
-import { MenuSheet } from "./MenuSheet";
+import { MenuSheet, type MenuOrigin } from "./MenuSheet";
 import { softSpring, spring } from "./motion";
 
 function navItems(t: Dictionary) {
@@ -25,16 +25,36 @@ export function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-// A newspaper-style masthead: a brand rule, a serif wordmark, and plain-text
-// navigation with a sliding underline on wide screens; on phones and tablets
-// a Menu button opens a panel from the right. The tagline folds away once
-// the reader scrolls, so the sticky bar takes less room.
+// A newspaper-style masthead with the section you're in, and a pop-up menu
+// opened from the Menu button, the tab on the right edge, or the M key. The
+// tagline folds away once the reader scrolls, so the sticky bar takes less room.
 export function SiteShell({ children }: { children: React.ReactNode }) {
   const { t, language, setLanguage, result, asking } = useCivica();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOrigin, setMenuOrigin] = useState<MenuOrigin | null>(null);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
-  const menuButton = useRef<HTMLButtonElement>(null);
+  // Focus returns to whichever button opened the menu.
+  const menuButton = useRef<HTMLElement | null>(null);
+  const openMenuFrom = useCallback((button: HTMLElement | null) => {
+    menuButton.current = button;
+    const box = button?.getBoundingClientRect();
+    setMenuOrigin(box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : null);
+    setMenuOpen(true);
+  }, []);
+
+  // "M" opens the menu from anywhere, unless the reader is typing.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key.toLowerCase() !== "m" || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
+      event.preventDefault();
+      openMenuFrom(document.getElementById("menu-button"));
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [openMenuFrom]);
   const [compact, setCompact] = useState(false);
   const { scrollY } = useScroll();
   // Two thresholds, so the height change itself can't make it flicker.
@@ -46,45 +66,16 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   // "Your briefing" appears once there is one, or one is being researched.
   const items = navItems(t).filter((item) => item.href !== "/briefing" || asking || result);
 
-  const desktopLinks = (
-    <LayoutGroup id="desktop-nav">
-      {items.map((item) => {
-        const active = isActive(pathname, item.href);
-        const showBadge = item.href === "/briefing" && asking && !active;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-current={active ? "page" : undefined}
-            className={`relative flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors ${
-              active ? "text-ink" : "text-muted hover:text-ink"
-            }`}
-          >
-            {item.label}
-            {showBadge && (
-              <motion.span
-                className="inline-block size-1.5 rounded-full bg-accent"
-                animate={{ opacity: [1, 0.3, 1] }}
-                transition={{ duration: 1.2, repeat: Infinity }}
-                aria-hidden
-              />
-            )}
-            {active && (
-              <motion.span layoutId="nav-underline" className="absolute inset-x-3 -bottom-px h-0.5 bg-accent" transition={spring} />
-            )}
-          </Link>
-        );
-      })}
-    </LayoutGroup>
-  );
+  const current = items.find((item) => isActive(pathname, item.href));
 
   return (
     <MotionConfig reducedMotion="user">
       <div className="flex flex-1 flex-col">
         {introActive && <Intro />}
         <header className="sticky top-0 z-20 border-t-4 border-b border-t-accent border-b-line bg-canvas/90 backdrop-blur-md">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-x-6 px-4 pt-3.5 pb-2 sm:px-6 md:items-end">
-            <Link href="/" className="text-left">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-x-6 px-4 py-3 sm:px-6">
+            <div className="flex min-w-0 items-baseline gap-3">
+            <Link href="/" className="shrink-0 text-left">
               <span className="block font-serif text-3xl font-semibold leading-none tracking-tight">Civica</span>
               <AnimatePresence initial={false}>
                 {!compact && (
@@ -100,7 +91,24 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 )}
               </AnimatePresence>
             </Link>
-            <div className="flex items-center gap-3">
+            {/* Which section you're in, sliding in as you move between them. */}
+            <AnimatePresence mode="wait" initial={false}>
+              {current && current.href !== "/" && (
+                <motion.span
+                  key={current.href}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={softSpring}
+                  className="hidden truncate font-serif text-lg text-muted sm:block"
+                >
+                  <span aria-hidden className="mr-3 text-line">/</span>
+                  {current.label}
+                </motion.span>
+              )}
+            </AnimatePresence>
+            </div>
+            <div className="flex shrink-0 items-center gap-3">
               <div role="group" aria-label={t.languageLabel} className="hidden items-center gap-1 text-sm md:flex">
                 {(Object.keys(LANGUAGES) as Language[]).map((code, i) => (
                   <span key={code} className="flex items-center gap-1">
@@ -119,14 +127,14 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 ))}
               </div>
               <motion.button
-                ref={menuButton}
+                id="menu-button"
                 type="button"
-                onClick={() => setMenuOpen(true)}
+                onClick={(event) => openMenuFrom(event.currentTarget)}
                 aria-expanded={menuOpen}
                 aria-controls="site-menu"
                 aria-haspopup="dialog"
                 whileTap={{ scale: 0.96 }}
-                className="flex items-center gap-2 rounded-full border border-line bg-surface py-1.5 pr-3.5 pl-3 text-sm font-medium shadow-sm transition-colors hover:border-ink md:hidden"
+                className="flex items-center gap-2 rounded-full border border-line bg-surface py-2 pr-4 pl-3.5 text-sm font-medium shadow-sm transition-colors hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
                 <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
                   <path d="M3 6h14M3 10h14M9 14h8" />
@@ -143,12 +151,33 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               </motion.button>
             </div>
           </div>
-          <nav aria-label={t.mainMenu} className="mx-auto hidden max-w-5xl px-1 sm:px-3 md:flex">
-            {desktopLinks}
-          </nav>
         </header>
+        {/* The tab on the right edge: the menu is always one click away. */}
+        <motion.button
+          type="button"
+          onClick={(event) => openMenuFrom(event.currentTarget)}
+          aria-label={t.menu}
+          aria-expanded={menuOpen}
+          aria-controls="site-menu"
+          aria-haspopup="dialog"
+          style={{ y: "-50%" }}
+          initial={{ x: 64 }}
+          animate={{ x: menuOpen ? 64 : 0 }}
+          whileHover={{ x: -4 }}
+          whileTap={{ scale: 0.96 }}
+          transition={spring}
+          className="fixed top-1/2 right-0 z-30 hidden flex-col items-center gap-3 rounded-l-2xl bg-accent py-5 pr-3 pl-3.5 text-accent-ink shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:flex"
+        >
+          <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+            <path d="M3 6h14M3 10h14M9 14h8" />
+          </svg>
+          <span aria-hidden className="text-xs font-semibold tracking-[0.2em] uppercase [writing-mode:vertical-rl] [:lang(ko)_&]:tracking-normal">
+            {t.menu}
+          </span>
+        </motion.button>
         <MenuSheet
           open={menuOpen}
+          origin={menuOrigin}
           onClose={closeMenu}
           returnFocusTo={menuButton}
           items={items.map((item) => ({

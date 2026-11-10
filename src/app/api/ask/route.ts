@@ -72,6 +72,8 @@ export async function POST(request: Request) {
         ...fact,
         source_ids: fact.source_ids.filter((id) => sourceIds.has(id)),
       })),
+      // Only an uploaded document has clauses to quote.
+      watch_outs: hasFile ? data.watch_outs.slice(0, 6) : [],
       for_you: data.for_you.map((item) => ({
         ...item,
         source_ids: item.source_ids.filter((id) => sourceIds.has(id)),

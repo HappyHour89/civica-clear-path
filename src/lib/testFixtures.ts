@@ -1,4 +1,4 @@
-import type { Briefing } from "./schemas";
+import type { Briefing, Comparison } from "./schemas";
 
 export const sampleBriefing: Briefing = {
   in_scope: true,
@@ -64,4 +64,37 @@ export const sampleBriefing: Briefing = {
     },
   ],
   follow_up_suggestions: ["When was the filibuster created?"],
+};
+
+export const sampleComparison: Comparison = {
+  in_scope: true,
+  out_of_scope_message: "",
+  title: "Lease: 2025 vs 2026",
+  summary: "Rent rises and a late fee was added.",
+  same_document: true,
+  mismatch_note: "",
+  changes: [
+    {
+      kind: "changed",
+      topic: "Monthly rent",
+      before: "Rent is $1,800 per month.",
+      after: "Rent is $1,950 per month.",
+      what_it_means: "Rent goes up $150 a month.",
+      significance: "major",
+    },
+    {
+      kind: "added",
+      topic: "Late fee",
+      before: "",
+      after: "A $75 late fee applies after the 3rd.",
+      what_it_means: "Paying late now costs $75.",
+      significance: "moderate",
+    },
+  ],
+  for_you: [
+    { situation: "renter", who: "If you rent", what_changes: "You pay $150 more.", certainty: "clear", source_ids: [9] },
+  ],
+  questions_to_consider: ["Can you negotiate the increase?"],
+  key_terms: [{ term: "Late fee", definition: "A charge for paying after the due date." }],
+  sources: [],
 };

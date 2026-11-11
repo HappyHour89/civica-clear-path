@@ -3,9 +3,10 @@ import { Messages } from "@anthropic-ai/sdk/resources/beta/messages/messages";
 import { Messages as StandardMessages } from "@anthropic-ai/sdk/resources/messages/messages";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as askRoute } from "../app/api/ask/route";
+import { POST as compareRoute } from "../app/api/compare/route";
 import { CivicaError, parseJsonAnswer, research, resetProviderStateForTests } from "./claude";
 import { BriefingSchema, FollowUpSchema } from "./schemas";
-import { sampleBriefing } from "./testFixtures";
+import { sampleBriefing, sampleComparison } from "./testFixtures";
 
 type FakeMessage = { stop_reason: string; content: unknown[] };
 
@@ -503,5 +504,55 @@ describe("POST /api/ask", () => {
     }
     expect(statuses.slice(0, 8).every((s) => s === 200)).toBe(true);
     expect(statuses[8]).toBe(429);
+  });
+});
+
+describe("POST /api/compare", () => {
+  beforeEach(() => {
+    resetProviderStateForTests();
+    process.env.ANTHROPIC_API_KEY = "test-key";
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function compareRequest(fields: Record<string, string | Blob>, ip: string) {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(fields)) form.set(key, value);
+    return new Request("http://localhost/api/compare", { method: "POST", body: form, headers: { "x-forwarded-for": ip } });
+  }
+
+  it("sends the older and newer versions in order and drops unverified citations", async () => {
+    const spy = mockResponses({ stop_reason: "tool_use", content: [toolCall("submit_comparison", sampleComparison)] });
+    const older = new File(["%PDF-1.7 old"], "lease-2025.pdf", { type: "application/pdf" });
+    const response = await compareRoute(
+      compareRequest({ before: older, afterText: "Rent is $1,950 per month.", language: "en", situations: "renter" }, "10.3.0.1"),
+    );
+    expect(response.status).toBe(200);
+    const { comparison } = await response.json();
+    expect(comparison.changes).toHaveLength(2);
+    expect(comparison.for_you[0].source_ids).toEqual([]);
+
+    const params = spy.mock.calls[0][0] as unknown as { messages: { content: { type: string; text?: string; title?: string }[] }[] };
+    const blocks = params.messages[0].content;
+    expect(blocks[0].text).toContain("VERSION A (older)");
+    expect(blocks[1]).toMatchObject({ type: "document", title: "lease-2025.pdf" });
+    expect(blocks[2].text).toContain("VERSION B (newer)");
+    expect(blocks[3]).toMatchObject({ type: "document", title: "Newer version" });
+    expect(blocks[4].text).toContain("Reader's situations: renter");
+  });
+
+  it("needs both versions", async () => {
+    const response = await compareRoute(compareRequest({ beforeText: "Old text", language: "en" }, "10.3.0.2"));
+    expect(response.status).toBe(400);
+  });
+
+  it("shows no changes when the files are not versions of the same document", async () => {
+    mockResponses({
+      stop_reason: "tool_use",
+      content: [toolCall("submit_comparison", { ...sampleComparison, same_document: false, mismatch_note: "Different documents." })],
+    });
+    const response = await compareRoute(compareRequest({ beforeText: "A lease", afterText: "A recipe", language: "en" }, "10.3.0.3"));
+    expect((await response.json()).comparison.changes).toEqual([]);
   });
 });

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import type { Dictionary } from "@/lib/i18n";
-import type { Briefing } from "@/lib/schemas";
+import type { Briefing, ForYouItem, Source } from "@/lib/schemas";
 import type { Situation } from "@/lib/situations";
 import { BriefingActions } from "./BriefingActions";
 import { useCivica } from "./CivicaProvider";
@@ -153,7 +153,7 @@ function useBriefing(): { t: Dictionary; b: Briefing; fromDocument: boolean; sit
 // A claim with numbered footnotes. Clicking a number opens that source
 // inline: type, date, quoted passage, and a link to the full list. `labels`
 // sit under the text (evidence level, disputed, certainty).
-function Claim(props: { text: string; sourceIds: number[]; b: Briefing; t: Dictionary; labels?: React.ReactNode }) {
+function Claim(props: { text: string; sourceIds: number[]; b: { sources: Source[] }; t: Dictionary; labels?: React.ReactNode }) {
   const { b, t } = props;
   const [open, setOpen] = useState<number | null>(null);
   const cited = b.sources.filter((s) => props.sourceIds.includes(s.id));
@@ -231,7 +231,7 @@ function Fact({ fact, b, t }: { fact: Briefing["key_facts"][number]; b: Briefing
   );
 }
 
-const certaintyStyles: Record<Briefing["for_you"][number]["certainty"], string> = {
+const certaintyStyles: Record<ForYouItem["certainty"], string> = {
   clear: "border-accent/40 text-accent",
   depends: "border-warn-ink/40 text-warn-ink",
   not_affected: "border-line text-muted",
@@ -284,7 +284,18 @@ function WatchOuts({ b, t }: { b: Briefing; t: Dictionary }) {
 
 // "What changes for you": one card per situation the reader picked, or the
 // groups most affected when they picked none.
-function ForYou({ b, t, situations }: { b: Briefing; t: Dictionary; situations: Situation[] }) {
+export function ForYou({
+  b,
+  t,
+  situations,
+  fromDocuments = false,
+}: {
+  b: { for_you: ForYouItem[]; sources: Source[] };
+  t: Dictionary;
+  situations: Situation[];
+  // Comparisons rest on the documents themselves, not web sources.
+  fromDocuments?: boolean;
+}) {
   if (b.for_you.length === 0) return null;
   const personal = situations.length > 0;
   return (
@@ -317,7 +328,7 @@ function ForYou({ b, t, situations }: { b: Briefing; t: Dictionary; situations: 
                 t={t}
                 labels={
                   <span className={`inline-block rounded-sm border px-1.5 text-xs font-medium ${certaintyStyles[item.certainty]}`}>
-                    {t.certainty[item.certainty]}
+                    {fromDocuments && item.certainty === "clear" ? t.certaintyFromDocument : t.certainty[item.certainty]}
                   </span>
                 }
               />
@@ -325,7 +336,7 @@ function ForYou({ b, t, situations }: { b: Briefing; t: Dictionary; situations: 
           </StaggerItem>
         ))}
       </Stagger>
-      {!personal && <p className="text-sm text-muted">{t.forYouPickHint}</p>}
+      {!personal && !fromDocuments && <p className="text-sm text-muted">{t.forYouPickHint}</p>}
     </Section>
   );
 }

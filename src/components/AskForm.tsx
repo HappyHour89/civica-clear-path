@@ -46,7 +46,7 @@ function LocalContextNote() {
 }
 
 // Optional situations, so the answer says what changes for someone like you.
-function SituationPicker() {
+export function SituationPicker() {
   const { t, situations, setSituations, asking } = useCivica();
   const toggle = (id: Situation) =>
     setSituations(situations.includes(id) ? situations.filter((s) => s !== id) : [...situations, id]);
@@ -89,7 +89,7 @@ function SituationPicker() {
 
 // Seconds since `active` became true, so a long wait shows honest progress
 // (time passing) rather than invented stages.
-function useElapsed(active: boolean) {
+export function useElapsed(active: boolean) {
   const [seconds, setSeconds] = useState(0);
   useEffect(() => {
     if (!active) return;

@@ -1,6 +1,6 @@
 import type { Dictionary, Language } from "./i18n";
 import type { OfficialsResult } from "./officials";
-import type { Briefing, FollowUp } from "./schemas";
+import type { Briefing, Comparison, FollowUp } from "./schemas";
 
 export type ChatTurn = { role: "user" | "assistant"; content: string; sources?: FollowUp["sources"] };
 
@@ -84,4 +84,22 @@ export async function startCheckout(
   // Only ever send donors to Stripe's own checkout page.
   if (!url.startsWith("https://checkout.stripe.com/")) throw new Error(t.genericError);
   return url;
+}
+
+export type VersionInput = { file: File | null; text: string };
+
+export async function compareVersions(
+  input: { before: VersionInput; after: VersionInput; language: Language; state: string; situations: string[] },
+  t: Dictionary,
+) {
+  const form = new FormData();
+  for (const [name, side] of [["before", input.before], ["after", input.after]] as const) {
+    if (side.file) form.set(name, side.file);
+    else form.set(`${name}Text`, side.text);
+  }
+  form.set("language", input.language);
+  form.set("state", input.state);
+  if (input.situations.length) form.set("situations", input.situations.join(","));
+  const response = await fetch("/api/compare", { method: "POST", body: form });
+  return (await readJson<{ comparison: Comparison }>(response, t, input.language)).comparison;
 }

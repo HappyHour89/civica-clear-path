@@ -36,6 +36,18 @@ export const SourceSchema = z.strictObject({
     ),
 });
 
+export const ForYouItemSchema = z.strictObject({
+  situation: z
+    .string()
+    .describe("The reader's situation id this item is about (e.g. 'renter'), or empty when no situations were given."),
+  who: z.string().describe("Short label for who this is about, e.g. 'If you rent your home'."),
+  what_changes: z.string().describe("One or two plain sentences on what concretely changes for them."),
+  certainty: z
+    .enum(["clear", "depends", "not_affected"])
+    .describe("clear: the sources say so directly; depends: it turns on details or pending decisions; not_affected: no direct change."),
+  source_ids: z.array(z.number().int()).describe("ids from `sources` that support this item."),
+});
+
 export const BriefingSchema = z.strictObject({
   in_scope: z
     .boolean()
@@ -46,19 +58,7 @@ export const BriefingSchema = z.strictObject({
   title: z.string().describe("Short neutral title for the topic."),
   summary: z.string().describe("2-4 sentence plain-language explanation a 9th grader could follow."),
   for_you: z
-    .array(
-      z.strictObject({
-        situation: z
-          .string()
-          .describe("The reader's situation id this item is about (e.g. 'renter'), or empty when no situations were given."),
-        who: z.string().describe("Short label for who this is about, e.g. 'If you rent your home'."),
-        what_changes: z.string().describe("One or two plain sentences on what concretely changes for them."),
-        certainty: z
-          .enum(["clear", "depends", "not_affected"])
-          .describe("clear: the sources say so directly; depends: it turns on details or pending decisions; not_affected: no direct change."),
-        source_ids: z.array(z.number().int()).describe("ids from `sources` that support this item."),
-      }),
-    )
+    .array(ForYouItemSchema)
     .describe("What changes for the reader, or for the groups most affected. See the system prompt."),
   watch_outs: z
     .array(
@@ -128,8 +128,44 @@ export const FollowUpSchema = z.strictObject({
   sources: z.array(SourceSchema),
 });
 
+export const CHANGE_KINDS = ["added", "removed", "changed"] as const;
+
+// Compare versions: what changed between an older and a newer document.
+export const CompareSchema = z.strictObject({
+  in_scope: z
+    .boolean()
+    .describe("False only if the documents have nothing to do with law, government, policy, contracts, or civic life."),
+  out_of_scope_message: z.string().describe("If in_scope is false, a short polite note. Otherwise empty."),
+  title: z.string().describe("Short neutral title naming the document, e.g. 'Lease renewal: 2025 vs 2026'."),
+  summary: z.string().describe("2-4 plain sentences on what changed overall."),
+  same_document: z.boolean().describe("False if the two files are not versions of the same document."),
+  mismatch_note: z.string().describe("If same_document is false, explain briefly. Otherwise empty."),
+  changes: z
+    .array(
+      z.strictObject({
+        kind: z.enum(CHANGE_KINDS).describe("added: only in the newer version; removed: only in the older; changed: in both but different."),
+        topic: z.string().describe("A few plain words naming what changed, e.g. 'Late fee'."),
+        before: z.string().describe("Exact wording from the OLDER version, under 300 characters. Empty when kind is added."),
+        after: z.string().describe("Exact wording from the NEWER version, under 300 characters. Empty when kind is removed."),
+        what_it_means: z.string().describe("One or two plain sentences on what this change means in practice and for whom."),
+        significance: z
+          .enum(["major", "moderate", "minor"])
+          .describe("major: changes money, rights, deadlines, or obligations in a big way; moderate: noticeable; minor: small."),
+      }),
+    )
+    .describe("Every meaningful change, most significant first. Ignore pure formatting, numbering, and typo fixes."),
+  for_you: z.array(ForYouItemSchema).describe("What these changes mean for the reader's situations, or the groups most affected."),
+  questions_to_consider: z.array(z.string()).describe("Open questions that help the reader decide what to do. Never leading."),
+  key_terms: z
+    .array(z.strictObject({ term: z.string(), definition: z.string() }))
+    .describe("Difficult words from the documents, defined in plain language."),
+  sources: z.array(SourceSchema).describe("Only pages you searched for context, if any. Usually empty."),
+});
+
 export type Source = z.infer<typeof SourceSchema>;
 export type Briefing = z.infer<typeof BriefingSchema>;
+export type Comparison = z.infer<typeof CompareSchema>;
+export type ForYouItem = z.infer<typeof ForYouItemSchema>;
 export type FollowUp = z.infer<typeof FollowUpSchema>;
 
 const UNSUPPORTED_KEYWORDS = new Set(["$schema", "minimum", "maximum"]);

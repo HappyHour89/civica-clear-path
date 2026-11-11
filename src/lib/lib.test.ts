@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { findOfficials, parseCensusDistrict, parseLegislators } from "./officials";
 import { checkRateLimit } from "./rateLimit";
-import { BriefingSchema, type Source, toolInputSchema } from "./schemas";
+import { BriefingSchema, CompareSchema, type Source, toolInputSchema } from "./schemas";
 import {
   absoluteDate,
   collectSearchResultUrls,
@@ -16,7 +16,7 @@ import {
 import { parseSituations } from "./situations";
 import { wrapText } from "./shareCard";
 import { describeRequestContext } from "./prompts";
-import { sampleBriefing } from "./testFixtures";
+import { sampleBriefing, sampleComparison } from "./testFixtures";
 import { fileToContentBlock } from "./upload";
 
 describe("toolInputSchema", () => {
@@ -28,8 +28,11 @@ describe("toolInputSchema", () => {
     }
   }
 
-  it("produces a schema Claude's strict mode accepts", () => {
-    walk(toolInputSchema(BriefingSchema), (obj) => {
+  it.each([
+    ["briefing", BriefingSchema],
+    ["comparison", CompareSchema],
+  ])("produces a %s schema Claude's strict mode accepts", (_, schema) => {
+    walk(toolInputSchema(schema), (obj) => {
       expect(obj).not.toHaveProperty("$schema");
       expect(obj).not.toHaveProperty("minimum");
       expect(obj).not.toHaveProperty("maximum");
@@ -38,6 +41,10 @@ describe("toolInputSchema", () => {
         expect(obj.required).toEqual(Object.keys(obj.properties as object));
       }
     });
+  });
+
+  it("accepts a well-formed comparison", () => {
+    expect(CompareSchema.safeParse(sampleComparison).success).toBe(true);
   });
 
   it("accepts a well-formed briefing", () => {

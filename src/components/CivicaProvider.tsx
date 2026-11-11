@@ -1,10 +1,10 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { askQuestion, fetchOfficials, type ChatTurn } from "@/lib/client";
+import { askQuestion, compareVersions, fetchOfficials, type ChatTurn, type VersionInput } from "@/lib/client";
 import { DICTIONARIES, isLanguage, type Dictionary, type Language } from "@/lib/i18n";
 import type { OfficialsResult } from "@/lib/officials";
-import type { Briefing } from "@/lib/schemas";
+import type { Briefing, Comparison } from "@/lib/schemas";
 import { parseSituations, type Situation } from "@/lib/situations";
 import { isStateCode } from "@/lib/states";
 
@@ -17,6 +17,8 @@ export type BriefingResult = {
   briefing: Briefing;
   fromDocument: boolean;
 };
+
+export type ComparisonResult = { comparison: Comparison; situations: Situation[]; names: { before: string; after: string } };
 
 export type OfficialsState = { state: string; officials: OfficialsResult | null; error: boolean };
 
@@ -40,6 +42,11 @@ type CivicaContextValue = {
   ask: (input: AskInput) => Promise<boolean>;
   turns: ChatTurn[];
   setTurns: (turns: ChatTurn[]) => void;
+  // Compare versions keeps its last result while the reader moves around.
+  comparison: ComparisonResult | null;
+  comparing: boolean;
+  compareError: string | null;
+  compare: (before: VersionInput, after: VersionInput) => Promise<boolean>;
 };
 
 const CivicaContext = createContext<CivicaContextValue | null>(null);
@@ -75,6 +82,9 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
   const [asking, setAsking] = useState(false);
   const [askError, setAskError] = useState<CivicaContextValue["askError"]>(null);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [comparison, setComparison] = useState<ComparisonResult | null>(null);
+  const [comparing, setComparing] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
   const t = DICTIONARIES[language];
 
   // Restored after hydration so server and client render the same first frame.
@@ -147,6 +157,29 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
     [state, situations, officials, lookUpOfficials, language, t],
   );
 
+  const compare = useCallback(
+    async (before: VersionInput, after: VersionInput) => {
+      setComparing(true);
+      setCompareError(null);
+      try {
+        const result = await compareVersions({ before, after, language, state, situations }, t);
+        const name = (side: VersionInput, fallback: string) => side.file?.name ?? fallback;
+        setComparison({
+          comparison: result,
+          situations,
+          names: { before: name(before, t.compareBefore), after: name(after, t.compareAfter) },
+        });
+        return true;
+      } catch (e) {
+        setCompareError(e instanceof Error ? e.message : t.genericError);
+        return false;
+      } finally {
+        setComparing(false);
+      }
+    },
+    [language, state, situations, t],
+  );
+
   const value = useMemo(
     () => ({
       language,
@@ -165,8 +198,12 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
       ask,
       turns,
       setTurns,
+      comparison,
+      comparing,
+      compareError,
+      compare,
     }),
-    [language, setLanguage, t, state, setState, situations, setSituations, officials, lookUpOfficials, officialsLoading, result, asking, askError, ask, turns],
+    [language, setLanguage, t, state, setState, situations, setSituations, officials, lookUpOfficials, officialsLoading, result, asking, askError, ask, turns, comparison, comparing, compareError, compare],
   );
 
   return <CivicaContext value={value}>{children}</CivicaContext>;

@@ -3,10 +3,11 @@ import { Messages } from "@anthropic-ai/sdk/resources/beta/messages/messages";
 import { Messages as StandardMessages } from "@anthropic-ai/sdk/resources/messages/messages";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as askRoute } from "../app/api/ask/route";
+import { POST as billRoute } from "../app/api/bill/route";
 import { POST as compareRoute } from "../app/api/compare/route";
 import { CivicaError, parseJsonAnswer, research, resetProviderStateForTests } from "./claude";
 import { BriefingSchema, FollowUpSchema } from "./schemas";
-import { sampleBriefing, sampleComparison } from "./testFixtures";
+import { sampleBill, sampleBriefing, sampleComparison } from "./testFixtures";
 
 type FakeMessage = { stop_reason: string; content: unknown[] };
 
@@ -554,5 +555,51 @@ describe("POST /api/compare", () => {
     });
     const response = await compareRoute(compareRequest({ beforeText: "A lease", afterText: "A recipe", language: "en" }, "10.3.0.3"));
     expect((await response.json()).comparison.changes).toEqual([]);
+  });
+});
+
+describe("POST /api/bill", () => {
+  beforeEach(() => {
+    resetProviderStateForTests();
+    process.env.ANTHROPIC_API_KEY = "test-key";
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const billRequest = (body: unknown, ip: string) =>
+    new Request("http://localhost/api/bill", {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: { "content-type": "application/json", "x-forwarded-for": ip },
+    });
+
+  it("returns the bill with its timeline in order and only a searched official link", async () => {
+    const spy = mockResponses({
+      stop_reason: "tool_use",
+      content: [
+        searchResult("https://www.congress.gov/bill/119th-congress/house-bill/1234"),
+        toolCall("submit_bill_status", sampleBill),
+      ],
+    });
+    const response = await billRoute(billRequest({ query: "HR 1234", language: "en", state: "CA" }, "10.4.0.1"));
+    expect(response.status).toBe(200);
+    const { bill } = await response.json();
+    expect(bill.timeline.map((e: { date: string }) => e.date)).toEqual(["2026-02-20", "2026-03-01"]);
+    expect(bill.official_url).toBe(sampleBill.official_url);
+    expect(bill.sources).toHaveLength(1);
+    const params = spy.mock.calls[0][0] as unknown as { messages: { content: string }[] };
+    expect(params.messages[0].content).toContain("<bill_request>\nHR 1234\n</bill_request>");
+  });
+
+  it("drops an official link the search never returned", async () => {
+    mockResponses({ stop_reason: "tool_use", content: [toolCall("submit_bill_status", sampleBill)] });
+    const { bill } = await (await billRoute(billRequest({ query: "HR 1234", language: "en" }, "10.4.0.2"))).json();
+    expect(bill.official_url).toBe("");
+    expect(bill.sources).toEqual([]);
+  });
+
+  it("rejects an empty request", async () => {
+    expect((await billRoute(billRequest({ query: " ", language: "en" }, "10.4.0.3"))).status).toBe(400);
   });
 });

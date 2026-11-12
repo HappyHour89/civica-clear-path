@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { findOfficials, parseCensusDistrict, parseLegislators } from "./officials";
 import { checkRateLimit } from "./rateLimit";
-import { BriefingSchema, CompareSchema, type Source, toolInputSchema } from "./schemas";
+import { BillSchema, BriefingSchema, CompareSchema, type Source, toolInputSchema } from "./schemas";
 import {
   absoluteDate,
   collectSearchResultUrls,
@@ -16,7 +16,8 @@ import {
 import { parseSituations } from "./situations";
 import { wrapText } from "./shareCard";
 import { describeRequestContext } from "./prompts";
-import { sampleBriefing, sampleComparison } from "./testFixtures";
+import { sampleBill, sampleBriefing, sampleComparison } from "./testFixtures";
+import { billKey, detectUpdate, trackPosition } from "./followedBills";
 import { fileToContentBlock } from "./upload";
 
 describe("toolInputSchema", () => {
@@ -31,6 +32,7 @@ describe("toolInputSchema", () => {
   it.each([
     ["briefing", BriefingSchema],
     ["comparison", CompareSchema],
+    ["bill", BillSchema],
   ])("produces a %s schema Claude's strict mode accepts", (_, schema) => {
     walk(toolInputSchema(schema), (obj) => {
       expect(obj).not.toHaveProperty("$schema");
@@ -274,5 +276,35 @@ describe("share card text", () => {
 
   it("breaks words longer than a line by character", () => {
     expect(wrapText(measure, "가나다라마바사", 30, 5)).toEqual(["가나다", "라마바", "사"]);
+  });
+});
+
+describe("followed bills", () => {
+  const base = {
+    ...sampleBill,
+    stage: "committee" as const,
+    last_action: "Referred to the Committee on Commerce.",
+    last_action_date: "2026-03-01",
+  };
+
+  it("keys a bill by jurisdiction, number, and session", () => {
+    expect(billKey(base)).toBe(billKey({ ...base, number: "h.r.  1234" }));
+    expect(billKey(base)).not.toBe(billKey({ ...base, session: "120th Congress" }));
+  });
+
+  it("notices a new stage or a new dated action, and nothing else", () => {
+    expect(detectUpdate(base, { ...base, summary: "Reworded." })).toBeNull();
+    expect(detectUpdate(base, { ...base, stage: "passed_one_chamber" })).toMatchObject({ from: "committee", to: "passed_one_chamber" });
+    expect(detectUpdate(base, { ...base, last_action: "Hearing held.", last_action_date: "2026-04-02" })).toMatchObject({
+      from: "committee",
+      to: "committee",
+    });
+  });
+
+  it("places stages on the track, with a veto at the signing step", () => {
+    expect(trackPosition("introduced")).toBe(0);
+    expect(trackPosition("enacted")).toBe(5);
+    expect(trackPosition("vetoed")).toBe(4);
+    expect(trackPosition("unknown")).toBe(-1);
   });
 });

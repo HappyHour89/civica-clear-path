@@ -1,4 +1,4 @@
-import type { Briefing, Comparison } from "./schemas";
+import type { Bill, Briefing, Comparison } from "./schemas";
 
 export const sampleBriefing: Briefing = {
   in_scope: true,
@@ -97,4 +97,38 @@ export const sampleComparison: Comparison = {
   questions_to_consider: ["Can you negotiate the increase?"],
   key_terms: [{ term: "Late fee", definition: "A charge for paying after the due date." }],
   sources: [],
+};
+
+export const sampleBill: Bill = {
+  found: true,
+  not_found_message: "",
+  possible_matches: [],
+  jurisdiction: "U.S. Congress",
+  number: "H.R. 1234",
+  session: "119th Congress",
+  title: "Example Online Safety Act",
+  nickname: "",
+  summary: "Sets new rules for online platforms.",
+  stage: "committee",
+  status_text: "In committee.",
+  last_action: "Referred to committee.",
+  last_action_date: "2026-03-01",
+  next_step: "A committee vote.",
+  timeline: [
+    { date: "2026-03-01", event: "Referred to committee." },
+    { date: "2026-02-20", event: "Introduced." },
+  ],
+  sponsors: [{ name: "Rep. Example", detail: "D-CA" }],
+  official_url: "https://www.congress.gov/bill/119th-congress/house-bill/1234",
+  sources: [
+    {
+      id: 1,
+      title: "H.R.1234",
+      url: "https://www.congress.gov/bill/119th-congress/house-bill/1234",
+      publisher: "Congress.gov",
+      source_type: "government",
+      published: "",
+      excerpt: "",
+    },
+  ],
 };

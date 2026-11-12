@@ -15,6 +15,7 @@ function navItems(t: Dictionary) {
     { href: "/", label: t.navAsk, description: t.navAskDesc },
     { href: "/document", label: t.navDocument, description: t.navDocumentDesc },
     { href: "/compare", label: t.navCompare, description: t.navCompareDesc },
+    { href: "/bills", label: t.navBills, description: t.navBillsDesc },
     { href: "/representatives", label: t.navRepresentatives, description: t.navRepresentativesDesc },
     { href: "/briefing", label: t.navBriefing, description: t.navBriefingDesc },
     { href: "/about", label: t.navAbout, description: t.navAboutDesc },

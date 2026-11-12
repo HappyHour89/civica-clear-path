@@ -1,6 +1,6 @@
 import type { Dictionary, Language } from "./i18n";
 import type { OfficialsResult } from "./officials";
-import type { Briefing, Comparison, FollowUp } from "./schemas";
+import type { Bill, Briefing, Comparison, FollowUp } from "./schemas";
 
 export type ChatTurn = { role: "user" | "assistant"; content: string; sources?: FollowUp["sources"] };
 
@@ -102,4 +102,13 @@ export async function compareVersions(
   if (input.situations.length) form.set("situations", input.situations.join(","));
   const response = await fetch("/api/compare", { method: "POST", body: form });
   return (await readJson<{ comparison: Comparison }>(response, t, input.language)).comparison;
+}
+
+export async function lookUpBill(query: string, language: Language, state: string, t: Dictionary) {
+  const response = await fetch("/api/bill", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, language, state: state || null }),
+  });
+  return (await readJson<{ bill: Bill }>(response, t, language)).bill;
 }

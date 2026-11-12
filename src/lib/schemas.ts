@@ -162,9 +162,54 @@ export const CompareSchema = z.strictObject({
   sources: z.array(SourceSchema).describe("Only pages you searched for context, if any. Usually empty."),
 });
 
+export const BILL_STAGES = [
+  "introduced",
+  "committee",
+  "passed_one_chamber",
+  "passed_both",
+  "to_executive",
+  "enacted",
+  "vetoed",
+  "failed",
+  "unknown",
+] as const;
+
+export type BillStage = (typeof BILL_STAGES)[number];
+
+// Follow a bill: one bill's current status, found by web research.
+export const BillSchema = z.strictObject({
+  found: z.boolean().describe("False if no real bill matching the request could be verified."),
+  not_found_message: z.string().describe("If found is false, a short note on what to try instead. Otherwise empty."),
+  possible_matches: z
+    .array(z.string())
+    .describe("If the request is ambiguous or not found, up to 4 specific bills it might mean, e.g. 'H.R. 1 (119th Congress)'. Otherwise empty."),
+  jurisdiction: z.string().describe("'U.S. Congress' or the state legislature, e.g. 'California Legislature'."),
+  number: z.string().describe("Official bill number, e.g. 'H.R. 1234' or 'SB 9'."),
+  session: z.string().describe("Congress or legislative session, e.g. '119th Congress' or '2025-2026 Regular Session'."),
+  title: z.string().describe("Official short title, or the official title shortened."),
+  nickname: z.string().describe("Popular name if it has one, e.g. 'Kids Online Safety Act'. Otherwise empty."),
+  summary: z.string().describe("2-3 plain sentences on what the bill would do. Neutral."),
+  stage: z
+    .enum(BILL_STAGES)
+    .describe(
+      "Furthest point reached: introduced; committee (referred or in committee); passed_one_chamber; passed_both; to_executive (sent to the President or Governor); enacted (signed or became law); vetoed; failed (died, withdrawn, or session ended); unknown.",
+    ),
+  status_text: z.string().describe("One or two plain sentences on where the bill stands now."),
+  last_action: z.string().describe("The most recent official action, in plain words."),
+  last_action_date: z.string().describe("Date of the most recent action, YYYY-MM-DD, or empty if unknown."),
+  next_step: z.string().describe("What would have to happen next for it to move forward, in plain words."),
+  timeline: z
+    .array(z.strictObject({ date: z.string().describe("YYYY-MM-DD"), event: z.string() }))
+    .describe("Major actions, oldest first, at most 8."),
+  sponsors: z.array(z.strictObject({ name: z.string(), detail: z.string().describe("Party and state or district, or role.") })),
+  official_url: z.string().describe("The bill's page on the official legislature website, from your searches, or empty."),
+  sources: z.array(SourceSchema),
+});
+
 export type Source = z.infer<typeof SourceSchema>;
 export type Briefing = z.infer<typeof BriefingSchema>;
 export type Comparison = z.infer<typeof CompareSchema>;
+export type Bill = z.infer<typeof BillSchema>;
 export type ForYouItem = z.infer<typeof ForYouItemSchema>;
 export type FollowUp = z.infer<typeof FollowUpSchema>;
 

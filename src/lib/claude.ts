@@ -86,7 +86,14 @@ type ResearchOptions<T> = {
   toolDescription: string;
   schema: z.ZodType<T>;
   maxSearches: number;
+  // Called as the research happens, so the page can show live progress.
+  onProgress?: (event: ResearchProgress) => void;
 };
+
+export type ResearchProgress =
+  | { type: "search"; query: string }
+  | { type: "source"; url: string; title: string }
+  | { type: "writing" };
 
 type ResearchResult<T> = { data: T; searchedUrls: Set<string>; pageAges: Map<string, string> };
 
@@ -157,7 +164,10 @@ async function researchWithTools<T>(
   const pageAges = new Map<string, string>();
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const response = await client.beta.messages.create(buildRequest(provider, { ...options, messages }, level));
+    const params = buildRequest(provider, { ...options, messages }, level);
+    const response = options.onProgress
+      ? await streamRound(client, params, options.toolName, options.onProgress)
+      : await client.beta.messages.create(params);
     collectSearchResultUrls(response.content, searchedUrls, pageAges);
 
     if (response.stop_reason === "refusal") {
@@ -193,6 +203,41 @@ async function researchWithTools<T>(
   }
 
   throw new CivicaError("Research took too many steps. Please try again.", 504);
+}
+
+// Same request as messages.create, but streamed so each search, each source
+// and the start of the written answer are reported the moment they happen.
+async function streamRound(
+  client: Anthropic,
+  params: ReturnType<typeof buildRequest>,
+  toolName: string,
+  onProgress: (event: ResearchProgress) => void,
+): Promise<Anthropic.Beta.BetaMessage> {
+  const report = (event: ResearchProgress) => {
+    try {
+      onProgress(event);
+    } catch {
+      // A closed connection must never break the research itself.
+    }
+  };
+  const stream = client.beta.messages.stream(params);
+  stream.on("streamEvent", (event) => {
+    const block = event.type === "content_block_start" ? event.content_block : null;
+    if (block?.type === "tool_use" && block.name === toolName) report({ type: "writing" });
+  });
+  stream.on("contentBlock", (block) => {
+    if (block.type === "server_tool_use" && block.name === "web_search") {
+      const query = (block.input as { query?: unknown } | null)?.query;
+      if (typeof query === "string" && query.trim()) report({ type: "search", query: query.trim().slice(0, 200) });
+    } else if (block.type === "web_search_tool_result" && Array.isArray(block.content)) {
+      for (const result of block.content) {
+        if (result.type === "web_search_result" && result.url) {
+          report({ type: "source", url: result.url, title: (result.title || "").slice(0, 200) });
+        }
+      }
+    }
+  });
+  return stream.finalMessage();
 }
 
 // The most compatible form: a plain Messages request with no tools, asking

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { askQuestion, compareVersions, fetchOfficials, type ChatTurn, type VersionInput } from "@/lib/client";
+import { askQuestion, compareVersions, type ResearchStep, fetchOfficials, type ChatTurn, type VersionInput } from "@/lib/client";
 import { browserLanguage, DICTIONARIES, isLanguage, type Dictionary, type Language } from "@/lib/i18n";
 import type { OfficialsResult } from "@/lib/officials";
 import type { Briefing, Comparison } from "@/lib/schemas";
@@ -9,6 +9,24 @@ import { parseSituations, type Situation } from "@/lib/situations";
 import { isStateCode } from "@/lib/states";
 
 export type AskInput = { question: string; file: File | null };
+
+// Live research steps while a question is being answered.
+export type ResearchProgressState = {
+  queries: string[];
+  sources: { url: string; title: string }[];
+  writing: boolean;
+};
+
+const NO_PROGRESS: ResearchProgressState = { queries: [], sources: [], writing: false };
+
+function addStep(progress: ResearchProgressState, step: ResearchStep): ResearchProgressState {
+  if (step.type === "writing") return progress.writing ? progress : { ...progress, writing: true };
+  if (step.type === "search") {
+    return progress.queries.includes(step.query) ? progress : { ...progress, queries: [...progress.queries, step.query] };
+  }
+  if (progress.sources.length >= 40 || progress.sources.some((s) => s.url === step.url)) return progress;
+  return { ...progress, sources: [...progress.sources, { url: step.url, title: step.title }] };
+}
 
 export type BriefingResult = {
   question: string;
@@ -41,6 +59,7 @@ type CivicaContextValue = {
   officialsLoading: boolean;
   result: BriefingResult | null;
   asking: boolean;
+  progress: ResearchProgressState;
   // Which form the last failed request came from, so only that form shows it.
   askError: { fromDocument: boolean; message: string } | null;
   ask: (input: AskInput) => Promise<boolean>;
@@ -84,6 +103,7 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
   const [officialsLoading, setOfficialsLoading] = useState(false);
   const [result, setResult] = useState<BriefingResult | null>(null);
   const [asking, setAsking] = useState(false);
+  const [progress, setProgress] = useState<ResearchProgressState>(NO_PROGRESS);
   const [askError, setAskError] = useState<CivicaContextValue["askError"]>(null);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
@@ -145,12 +165,15 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
     async (input: AskInput) => {
       setAsking(true);
       setAskError(null);
+      setProgress(NO_PROGRESS);
       // Officials for a newly set state are looked up alongside the question.
       const officialsRequest =
         state && officials?.state !== state ? lookUpOfficials(state, "") : Promise.resolve();
       try {
         const [{ briefing, publishToken }] = await Promise.all([
-          askQuestion({ question: input.question, file: input.file, language, state, situations }, t),
+          askQuestion({ question: input.question, file: input.file, language, state, situations }, t, (step) =>
+            setProgress((current) => addStep(current, step)),
+          ),
           officialsRequest,
         ]);
         setResult({
@@ -211,6 +234,7 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
       officialsLoading,
       result,
       asking,
+      progress,
       askError,
       ask,
       turns,
@@ -220,7 +244,7 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
       compareError,
       compare,
     }),
-    [language, setLanguage, t, state, setState, situations, setSituations, officials, lookUpOfficials, officialsLoading, result, asking, askError, ask, turns, comparison, comparing, compareError, compare],
+    [language, setLanguage, t, state, setState, situations, setSituations, officials, lookUpOfficials, officialsLoading, result, asking, progress, askError, ask, turns, comparison, comparing, compareError, compare],
   );
 
   return <CivicaContext value={value}>{children}</CivicaContext>;

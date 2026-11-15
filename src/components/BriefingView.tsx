@@ -9,6 +9,7 @@ import type { Briefing, ForYouItem, Source } from "@/lib/schemas";
 import type { Situation } from "@/lib/situations";
 import { BriefingActions } from "./BriefingActions";
 import { SimplerBox, TermList, TermText } from "./Interactive";
+import { ResearchLive } from "./ResearchLive";
 import { useCivica } from "./CivicaProvider";
 import { FollowUpChat } from "./FollowUpChat";
 import { ProgressBar, softSpring, spring, Stagger, StaggerItem } from "./motion";
@@ -59,6 +60,7 @@ export function BriefingFrame({ children }: { children: React.ReactNode }) {
           <div role="status" className="space-y-3">
             <ProgressBar />
             <p className="text-muted">{t.briefingInProgress}</p>
+            <ResearchLive />
           </div>
         ) : (
           <p className="text-muted">

@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { CivicaError, research } from "@/lib/claude";
+import { CivicaError, research, type ResearchProgress } from "@/lib/claude";
 import { enforceRateLimit, errorResponse, todayIso } from "@/lib/http";
-import { isLanguage } from "@/lib/i18n";
+import { isLanguage, type Language } from "@/lib/i18n";
 import { describeRequestContext } from "@/lib/prompts";
 import { BriefingSchema } from "@/lib/schemas";
 import { signBriefing } from "@/lib/publicPages";
@@ -50,41 +50,98 @@ export async function POST(request: Request) {
         .join("\n\n"),
     });
 
-    const { data, searchedUrls, pageAges } = await research({
-      messages: [{ role: "user", content }],
-      toolName: "submit_briefing",
-      toolDescription: "Submit the finished, neutral civic briefing for the user's question.",
-      schema: BriefingSchema,
-      maxSearches: 6,
-    }).catch((error) => {
-      // A rejected request with a file attached is most often the file itself.
-      if (hasFile && error instanceof CivicaError && error.status === 400) {
-        throw new CivicaError("The file couldn't be processed. Try a smaller or different one.", 400);
-      }
-      throw error;
-    });
+    const answer = (onProgress?: (event: ResearchProgress) => void) =>
+      buildBriefing({ content, question, language, hasFile, onProgress });
 
-    const sources = verifySources(data.sources, searchedUrls, pageAges);
-    const sourceIds = new Set(sources.map((s) => s.id));
-    const briefing = {
-      ...data,
-      sources,
-      key_facts: data.key_facts.map((fact) => ({
-        ...fact,
-        source_ids: fact.source_ids.filter((id) => sourceIds.has(id)),
-      })),
-      // Only an uploaded document has clauses to quote.
-      watch_outs: hasFile ? data.watch_outs.slice(0, 6) : [],
-      for_you: data.for_you.map((item) => ({
-        ...item,
-        source_ids: item.source_ids.filter((id) => sourceIds.has(id)),
-      })),
-      helpful_websites: data.helpful_websites.filter((site) => isSafeHttpUrl(site.url)),
-    };
-    // Typed questions can be published as public pages; uploads never can.
-    const publishToken = !hasFile && briefing.in_scope ? signBriefing({ briefing, question, language }) : null;
-    return Response.json({ briefing, publishToken });
+    // stream=1: send each search and source as a line of JSON while the
+    // research runs, then the finished briefing as the last line.
+    if (form.get("stream") === "1") return streamAnswer(answer);
+    return Response.json(await answer());
   } catch (error) {
     return errorResponse(error);
   }
+}
+
+type BriefingAnswer = Awaited<ReturnType<typeof buildBriefing>>;
+
+type StreamLine =
+  | ResearchProgress
+  | ({ type: "done" } & BriefingAnswer)
+  | { type: "error"; message: string; status: number };
+
+function streamAnswer(answer: (onProgress: (event: ResearchProgress) => void) => Promise<BriefingAnswer>) {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (line: StreamLine | null) => {
+        try {
+          controller.enqueue(encoder.encode(line ? JSON.stringify(line) + "\n" : "\n"));
+        } catch {
+          // The reader left the page; the research still finishes quietly.
+        }
+      };
+      // A blank line now and then keeps proxies from closing a quiet connection.
+      const heartbeat = setInterval(() => send(null), 15_000);
+      try {
+        send({ type: "done", ...(await answer(send)) });
+      } catch (error) {
+        const response = errorResponse(error);
+        const { error: message } = (await response.json()) as { error: string };
+        send({ type: "error", message, status: response.status });
+      } finally {
+        clearInterval(heartbeat);
+        try {
+          controller.close();
+        } catch {}
+      }
+    },
+  });
+  return new Response(body, {
+    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" },
+  });
+}
+
+async function buildBriefing(input: {
+  content: Anthropic.Beta.BetaContentBlockParam[];
+  question: string;
+  language: Language;
+  hasFile: boolean;
+  onProgress?: (event: ResearchProgress) => void;
+}) {
+  const { content, question, language, hasFile, onProgress } = input;
+  const { data, searchedUrls, pageAges } = await research({
+    messages: [{ role: "user", content }],
+    toolName: "submit_briefing",
+    toolDescription: "Submit the finished, neutral civic briefing for the user's question.",
+    schema: BriefingSchema,
+    maxSearches: 6,
+    onProgress,
+  }).catch((error) => {
+    // A rejected request with a file attached is most often the file itself.
+    if (hasFile && error instanceof CivicaError && error.status === 400) {
+      throw new CivicaError("The file couldn't be processed. Try a smaller or different one.", 400);
+    }
+    throw error;
+  });
+
+  const sources = verifySources(data.sources, searchedUrls, pageAges);
+  const sourceIds = new Set(sources.map((s) => s.id));
+  const briefing = {
+    ...data,
+    sources,
+    key_facts: data.key_facts.map((fact) => ({
+      ...fact,
+      source_ids: fact.source_ids.filter((id) => sourceIds.has(id)),
+    })),
+    // Only an uploaded document has clauses to quote.
+    watch_outs: hasFile ? data.watch_outs.slice(0, 6) : [],
+    for_you: data.for_you.map((item) => ({
+      ...item,
+      source_ids: item.source_ids.filter((id) => sourceIds.has(id)),
+    })),
+    helpful_websites: data.helpful_websites.filter((site) => isSafeHttpUrl(site.url)),
+  };
+  // Typed questions can be published as public pages; uploads never can.
+  const publishToken = !hasFile && briefing.in_scope ? signBriefing({ briefing, question, language }) : null;
+  return { briefing, publishToken };
 }

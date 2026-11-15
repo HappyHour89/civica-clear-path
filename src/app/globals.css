@@ -61,10 +61,30 @@
   --color-warn-ink: var(--warn-ink);
   --color-error-soft: var(--error-soft);
   --color-error-ink: var(--error-ink);
-  /* Self-hosted (fontsource). Hangul falls through to Noto Sans KR. */
-  --font-sans: "Public Sans Variable", "Noto Sans KR", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+  /* Font stacks live in variables so each language can put its own script's
+     fonts first (see :lang rules below). */
+  --font-sans: var(--sans-stack);
+  --font-serif: var(--serif-stack);
+}
+
+:root {
+  /* Self-hosted Latin fonts (fontsource); Hangul falls through to Noto Sans KR. */
+  --sans-stack: "Public Sans Variable", "Noto Sans KR", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-  --font-serif: "Source Serif 4 Variable", "Noto Sans KR", ui-serif, Georgia, "Times New Roman", serif;
+  --serif-stack: "Source Serif 4 Variable", "Noto Sans KR", ui-serif, Georgia, "Times New Roman", serif;
+}
+
+/* Chinese: system Chinese fonts before the Korean one, so characters take
+   their Chinese forms. */
+:lang(zh-Hans) {
+  --sans-stack: "Public Sans Variable", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC",
+    "Noto Sans CJK SC", system-ui, sans-serif;
+  --serif-stack: "Source Serif 4 Variable", "Songti SC", "Noto Serif SC", "PingFang SC", "Microsoft YaHei", serif;
+}
+:lang(zh-Hant) {
+  --sans-stack: "Public Sans Variable", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", "Noto Sans CJK TC",
+    system-ui, sans-serif;
+  --serif-stack: "Source Serif 4 Variable", "Songti TC", "Noto Serif TC", "PingFang TC", "Microsoft JhengHei", serif;
 }
 
 body {
@@ -79,6 +99,16 @@ body {
 html:lang(ko) body {
   line-height: 1.8;
   word-break: keep-all;
+}
+
+/* Chinese reads better with a little more line height. */
+html:lang(zh) body {
+  line-height: 1.8;
+}
+
+/* Wide letter-spacing suits Latin capitals but pulls Chinese characters apart. */
+:lang(zh) [class*="tracking-"] {
+  letter-spacing: normal;
 }
 
 h1,

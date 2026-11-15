@@ -1,12 +1,34 @@
+import { es } from "./locales/es";
+import { tl } from "./locales/tl";
+import { vi } from "./locales/vi";
+import { zhHans } from "./locales/zhHans";
+import { zhHant } from "./locales/zhHant";
+
+// Each language: its own name for the picker, how the AI is told to write,
+// and the speech voice used by Listen.
 export const LANGUAGES = {
-  en: { label: "English", promptName: "English" },
-  ko: { label: "한국어", promptName: "Korean (한국어)" },
+  en: { label: "English", promptName: "English", voice: "en-US" },
+  es: { label: "Español", promptName: "Spanish (Español)", voice: "es-US" },
+  "zh-Hans": { label: "简体中文", promptName: "Simplified Chinese (简体中文)", voice: "zh-CN" },
+  "zh-Hant": { label: "繁體中文", promptName: "Traditional Chinese (繁體中文)", voice: "zh-TW" },
+  ko: { label: "한국어", promptName: "Korean (한국어)", voice: "ko-KR" },
+  vi: { label: "Tiếng Việt", promptName: "Vietnamese (Tiếng Việt)", voice: "vi-VN" },
+  tl: { label: "Tagalog", promptName: "Tagalog (Filipino)", voice: "fil-PH" },
 } as const;
 
 export type Language = keyof typeof LANGUAGES;
 
 export function isLanguage(value: unknown): value is Language {
-  return typeof value === "string" && value in LANGUAGES;
+  return typeof value === "string" && Object.hasOwn(LANGUAGES, value);
+}
+
+// Maps a browser language tag (e.g. "es-MX", "zh-TW", "fil") to one Civica has.
+export function browserLanguage(tag: string): Language | null {
+  const lower = tag.toLowerCase();
+  if (lower.startsWith("zh")) return /hant|-tw|-hk|-mo/.test(lower) ? "zh-Hant" : "zh-Hans";
+  const base = lower.split("-")[0];
+  if (base === "fil" || base === "tl") return "tl";
+  return isLanguage(base) ? base : null;
 }
 
 const en = {
@@ -794,4 +816,4 @@ const ko: Dictionary = {
   ],
 };
 
-export const DICTIONARIES: Record<Language, Dictionary> = { en, ko };
+export const DICTIONARIES: Record<Language, Dictionary> = { en, es, "zh-Hans": zhHans, "zh-Hant": zhHant, ko, vi, tl };

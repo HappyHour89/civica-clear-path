@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { askQuestion, compareVersions, fetchOfficials, type ChatTurn, type VersionInput } from "@/lib/client";
-import { DICTIONARIES, isLanguage, type Dictionary, type Language } from "@/lib/i18n";
+import { browserLanguage, DICTIONARIES, isLanguage, type Dictionary, type Language } from "@/lib/i18n";
 import type { OfficialsResult } from "@/lib/officials";
 import type { Briefing, Comparison } from "@/lib/schemas";
 import { parseSituations, type Situation } from "@/lib/situations";
@@ -97,6 +97,11 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
     const storedState = readStored(STATE_KEY);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore from storage
     if (isLanguage(storedLanguage)) setLanguageState(storedLanguage);
+    else {
+      // First visit: open in the reader's own language when Civica has it.
+      const preferred = navigator.languages?.map(browserLanguage).find((code) => code !== null);
+      if (preferred) setLanguageState(preferred);
+    }
     if (isStateCode(storedState)) setStateValue(storedState);
     setSituationsValue(parseSituations(readStored(SITUATIONS_KEY)));
   }, []);

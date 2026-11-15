@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { Language } from "@/lib/i18n";
+import { LANGUAGES, type Language } from "@/lib/i18n";
 import type { Briefing } from "@/lib/schemas";
 import { drawShareCard } from "@/lib/shareCard";
 import { publishBriefing } from "@/lib/client";
@@ -13,7 +13,6 @@ import { Button, Collapse, softSpring, spring } from "./motion";
 const noSubscribe = () => () => {};
 const canSpeak = () => "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
 
-const VOICE_LANG: Record<Language, string> = { en: "en-US", ko: "ko-KR" };
 
 // The parts worth hearing, in reading order. Sources and lists of links are
 // left to the screen.
@@ -53,8 +52,16 @@ function useSpeech(language: Language) {
   const speak = (parts: string[]) => {
     stop();
     const id = run.current;
-    const lang = VOICE_LANG[language];
-    const voice = window.speechSynthesis.getVoices().find((v) => v.lang.replace("_", "-").startsWith(lang.slice(0, 2)));
+    const lang = LANGUAGES[language].voice;
+    // Prefer the exact regional voice (zh-TW for Traditional Chinese), then
+    // any voice for the language. Tagalog voices may be labeled "fil" or "tl".
+    const voices = window.speechSynthesis.getVoices().map((v) => ({ v, code: v.lang.replace("_", "-").toLowerCase() }));
+    const base = lang.split("-")[0];
+    const voice = (
+      voices.find(({ code }) => code === lang.toLowerCase()) ??
+      voices.find(({ code }) => code.startsWith(`${base}-`) || code === base) ??
+      (language === "tl" ? voices.find(({ code }) => code.startsWith("tl")) : undefined)
+    )?.v;
     const sentences = chunks(parts);
     sentences.forEach((sentence, i) => {
       const utterance = new SpeechSynthesisUtterance(sentence);

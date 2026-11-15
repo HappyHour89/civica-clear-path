@@ -22,15 +22,23 @@ export const PageSchema = z.object({
   publishedAt: z.string(),
   // "ai_draft" until a person on the review panel signs off.
   status: z.enum(["ai_draft", "reviewed"]),
-  history: z.array(z.object({ at: z.string(), note: z.string() })),
-  corrections: z.array(z.object({ at: z.string(), text: z.string() })),
+  // note: "published" | "reviewed" | "unreviewed" | "corrected" | "noted" | "simplified"
+  history: z.array(z.object({ at: z.string(), note: z.string(), by: z.string().optional() })),
+  corrections: z.array(z.object({ at: z.string(), text: z.string(), by: z.string().optional() })),
+  // Filled in by the review panel (see /review). Older pages have none.
+  review: z
+    .object({ by: z.string(), at: z.string(), checklist: z.array(z.string()) })
+    .nullable()
+    .default(null),
+  reviewerNote: z.string().default(""),
+  simplerSummary: z.string().default(""),
 });
 
 export type PublishedPage = z.infer<typeof PageSchema>;
 
 export type LibraryEntry = { slug: string; title: string; summary: string; language: Language; publishedAt: string };
 
-function secret() {
+export function serverSecret() {
   if (process.env.PUBLISH_SECRET) return process.env.PUBLISH_SECRET;
   // Without its own setting, derive a key from a server-only secret that
   // never leaves the server.
@@ -43,7 +51,7 @@ function signed(payload: { briefing: Briefing; question: string; language: Langu
 }
 
 export function signBriefing(payload: { briefing: Briefing; question: string; language: Language }) {
-  const key = secret();
+  const key = serverSecret();
   return key ? createHmac("sha256", key).update(signed(payload)).digest("base64url") : null;
 }
 
@@ -90,8 +98,8 @@ export async function savePage(page: PublishedPage) {
   await put(libraryPath(page.slug, at), JSON.stringify(entry), options);
 }
 
-async function readJson(pathname: string): Promise<unknown> {
-  const result = await get(pathname, { access: "private" });
+export async function readJson(pathname: string, fresh = false): Promise<unknown> {
+  const result = await get(pathname, { access: "private", useCache: !fresh });
   if (!result || result.statusCode !== 200) return null;
   return JSON.parse(await new Response(result.stream).text());
 }
@@ -121,4 +129,24 @@ export async function listLibrary(limit = 30): Promise<LibraryEntry[]> {
   } catch {
     return [];
   }
+}
+
+// Uncached read for the review desk, which must see the latest version.
+export async function readPageFresh(slug: string): Promise<PublishedPage | null> {
+  if (!isSlug(slug) || !process.env.BLOB_READ_WRITE_TOKEN) return null;
+  try {
+    const parsed = PageSchema.safeParse(await readJson(`pages/${slug}.json`, true));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function writePage(page: PublishedPage) {
+  await put(`pages/${page.slug}.json`, JSON.stringify(page), {
+    access: "private",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    contentType: "application/json",
+  });
 }

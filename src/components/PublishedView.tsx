@@ -4,6 +4,9 @@ import Link from "next/link";
 import { DICTIONARIES } from "@/lib/i18n";
 import type { LibraryEntry, PublishedPage } from "@/lib/publicPages";
 import { Fact, ForYou } from "./BriefingView";
+import { FeedbackWidget, SimplerBox, TermList, TermText } from "./Interactive";
+import { motion } from "motion/react";
+import { spring } from "./motion";
 import { useCivica } from "./CivicaProvider";
 import { Stagger, StaggerItem } from "./motion";
 import { BulletList, Eyebrow, ExternalLink, PageIntro, Section, SourceList } from "./ui";
@@ -26,13 +29,20 @@ export function PublishedView({ page }: { page: PublishedPage }) {
               Civica · {t.navLibrary}
             </Link>
           </Eyebrow>
-          <span
-            className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
-              page.status === "reviewed" ? "border-accent bg-accent-soft text-accent" : "border-warn-ink/40 bg-warn-soft text-warn-ink"
-            }`}
-          >
-            {t.pageStatus[page.status]}
-          </span>
+          {page.status === "reviewed" && page.review ? (
+            <motion.span
+              initial={{ scale: 1.6, rotate: -14, opacity: 0 }}
+              animate={{ scale: 1, rotate: -3, opacity: 1 }}
+              transition={{ ...spring, delay: 0.3 }}
+              className="inline-flex items-center gap-1.5 rounded-md border-2 border-accent px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-accent"
+            >
+              ✓ {t.reviewedBy} {page.review.by} · {formatDate(page.review.at, page.language)}
+            </motion.span>
+          ) : (
+            <span className="rounded-full border border-warn-ink/40 bg-warn-soft px-2.5 py-0.5 text-xs font-semibold text-warn-ink">
+              {t.pageStatus.ai_draft}
+            </span>
+          )}
         </div>
         <h1 className="font-serif text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">{b.title}</h1>
         {page.question && (
@@ -45,20 +55,37 @@ export function PublishedView({ page }: { page: PublishedPage }) {
         </p>
       </header>
 
-      <Section title={t.summary}>
+      {page.reviewerNote && (
+        <aside className="space-y-1 rounded-r-lg border-l-4 border-accent bg-accent-soft/60 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
+            {t.reviewerNoteTitle}
+            {page.review && ` · ${page.review.by}`}
+          </p>
+          <p>{page.reviewerNote}</p>
+        </aside>
+      )}
+      <Section title={t.summary} note={b.key_terms.length > 0 ? t.termHint : undefined}>
         <p className="font-serif text-xl leading-relaxed first-letter:float-left first-letter:mr-2 first-letter:font-serif first-letter:text-6xl first-letter:leading-[0.85] first-letter:font-semibold">
-          {b.summary}
+          <TermText text={b.summary} terms={b.key_terms} />
         </p>
+        {page.simplerSummary ? (
+          <div className="space-y-2 rounded-xl border border-accent/30 bg-accent-soft/60 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">{t.simplerReviewer}</p>
+            <p className="text-lg leading-relaxed">{page.simplerSummary}</p>
+          </div>
+        ) : (
+          <SimplerBox request={{ slug: page.slug }} t={t} />
+        )}
       </Section>
       <ForYou b={b} t={t} situations={[]} fromDocuments={false} />
       {b.what_it_does.length > 0 && (
         <Section title={t.whatItDoes}>
-          <BulletList items={b.what_it_does} />
+          <TermList items={b.what_it_does} terms={b.key_terms} />
         </Section>
       )}
       {b.why_it_matters.length > 0 && (
         <Section title={t.whyItMatters}>
-          <BulletList items={b.why_it_matters} />
+          <TermList items={b.why_it_matters} terms={b.key_terms} />
         </Section>
       )}
       {b.key_facts.length > 0 && (
@@ -141,6 +168,7 @@ export function PublishedView({ page }: { page: PublishedPage }) {
             {page.corrections.map((c, i) => (
               <li key={i}>
                 <span className="font-semibold tabular-nums">{formatDate(c.at, page.language)}:</span> {c.text}
+                {c.by && <span className="text-muted"> ({t.correctionBy} {c.by})</span>}
               </li>
             ))}
           </ul>
@@ -151,11 +179,15 @@ export function PublishedView({ page }: { page: PublishedPage }) {
         <ul className="space-y-1">
           {page.history.map((h, i) => (
             <li key={i} className="tabular-nums">
-              {formatDate(h.at, page.language)} · {h.note === "published" ? t.pageHistoryPublished : h.note}
+              {formatDate(h.at, page.language)} ·{" "}
+              {h.note === "published"
+                ? t.pageHistoryPublished
+                : `${t.historyNotes[h.note as keyof typeof t.historyNotes] ?? h.note}${h.by ? ` ${h.by}` : ""}`}
             </li>
           ))}
         </ul>
       </section>
+      <FeedbackWidget slug={page.slug} t={t} />
       <p>
         <Link href="/" className="inline-flex h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-accent-ink hover:bg-accent-hover">
           {t.pageAskYourOwn} →

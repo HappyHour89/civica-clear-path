@@ -1,25 +1,40 @@
 "use client";
 
-import { AnimatePresence, MotionConfig, motion, useMotionValueEvent, useScroll } from "motion/react";
+import { AnimatePresence, LayoutGroup, MotionConfig, motion, useMotionValueEvent, useScroll } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { LANGUAGES, type Dictionary, type Language } from "@/lib/i18n";
 import { useCivica } from "./CivicaProvider";
 import { Intro } from "./Intro";
-import { MenuSheet, type MenuOrigin } from "./MenuSheet";
 import { softSpring, spring } from "./motion";
 
-function navItems(t: Dictionary) {
+type NavLink = { href: string; label: string; description: string };
+type NavEntry = NavLink | { group: string; links: NavLink[] };
+
+// Grouped so the top bar stays short: everything that explains something
+// together, everything you keep following together.
+function navEntries(t: Dictionary, showBriefing: boolean): NavEntry[] {
   return [
     { href: "/", label: t.navAsk, description: t.navAskDesc },
-    { href: "/charges", label: t.navCharges, description: t.navChargesDesc },
-    { href: "/document", label: t.navDocument, description: t.navDocumentDesc },
-    { href: "/compare", label: t.navCompare, description: t.navCompareDesc },
-    { href: "/bills", label: t.navBills, description: t.navBillsDesc },
-    { href: "/representatives", label: t.navRepresentatives, description: t.navRepresentativesDesc },
-    { href: "/briefing", label: t.navBriefing, description: t.navBriefingDesc },
+    {
+      group: t.navGroupExplain,
+      links: [
+        { href: "/document", label: t.navDocument, description: t.navDocumentDesc },
+        { href: "/charges", label: t.navCharges, description: t.navChargesDesc },
+        { href: "/compare", label: t.navCompare, description: t.navCompareDesc },
+      ],
+    },
+    {
+      group: t.navGroupFollow,
+      links: [
+        { href: "/newspaper", label: t.navNewspaper, description: t.navNewspaperDesc },
+        { href: "/bills", label: t.navBills, description: t.navBillsDesc },
+        { href: "/representatives", label: t.navRepresentatives, description: t.navRepresentativesDesc },
+      ],
+    },
     { href: "/library", label: t.navLibrary, description: t.navLibraryDesc },
+    ...(showBriefing ? [{ href: "/briefing", label: t.navBriefing, description: t.navBriefingDesc }] : []),
     { href: "/about", label: t.navAbout, description: t.navAboutDesc },
     { href: "/support", label: t.navSupport, description: t.navSupportDesc },
   ];
@@ -29,70 +44,15 @@ export function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-// Everything below reads the URL. Each piece sits in its own Suspense
-// boundary, so pages whose URL isn't known at build time (like /p/[slug])
-// can still prerender the rest of the masthead.
+const isGroup = (entry: NavEntry): entry is { group: string; links: NavLink[] } => "group" in entry;
 
 // The opening animation plays when a visit starts on the home page, not every
-// time someone navigates back to it.
+// time someone navigates back to it. (Reads the URL, so it sits in Suspense.)
 function IntroGate() {
   const pathname = usePathname();
   const [active, setActive] = useState(pathname === "/");
   if (active && pathname !== "/") setActive(false);
   return active ? <Intro /> : null;
-}
-
-// Which section you're in, sliding in as you move between them.
-function SectionCrumb({ items }: { items: { href: string; label: string }[] }) {
-  const pathname = usePathname();
-  const current = items.find((item) => isActive(pathname, item.href));
-  return (
-    <AnimatePresence mode="wait" initial={false}>
-      {current && current.href !== "/" && (
-        <motion.span
-          key={current.href}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={softSpring}
-          className="hidden truncate font-serif text-lg text-muted sm:block"
-        >
-          <span aria-hidden className="mr-3 text-line">/</span>
-          {current.label}
-        </motion.span>
-      )}
-    </AnimatePresence>
-  );
-}
-
-// A pulsing dot on the Menu button while a briefing is being researched.
-function ResearchDot() {
-  const { asking } = useCivica();
-  const pathname = usePathname();
-  if (!asking || isActive(pathname, "/briefing")) return null;
-  return (
-    <motion.span
-      className="inline-block size-1.5 rounded-full bg-accent"
-      animate={{ opacity: [1, 0.3, 1] }}
-      transition={{ duration: 1.2, repeat: Infinity }}
-      aria-hidden
-    />
-  );
-}
-
-function RoutedMenuSheet(props: Omit<React.ComponentProps<typeof MenuSheet>, "items"> & { items: ReturnType<typeof navItems> }) {
-  const { asking } = useCivica();
-  const pathname = usePathname();
-  return (
-    <MenuSheet
-      {...props}
-      items={props.items.map((item) => ({
-        ...item,
-        active: isActive(pathname, item.href),
-        badge: item.href === "/briefing" && asking && !isActive(pathname, item.href),
-      }))}
-    />
-  );
 }
 
 // A native menu: it works the same with a mouse, a keyboard, a screen reader,
@@ -124,41 +84,199 @@ export function LanguageSelect({ className = "" }: { className?: string }) {
   );
 }
 
-// A newspaper-style masthead with the section you're in, and a pop-up menu
-// opened from the Menu button, the tab on the right edge, or the M key. The
+function Underline() {
+  return <motion.span layoutId="nav-underline" className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-accent" transition={spring} />;
+}
+
+// A dropdown that fades and drops a few pixels into place: opens on hover
+// (with a short grace period so it doesn't flicker) or on click/Enter, and
+// closes on Escape, on leaving, or on choosing a link.
+function NavGroup({ group, links, pathname }: { group: string; links: NavLink[]; pathname: string }) {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const id = useId();
+  const active = links.some((link) => isActive(pathname, link.href));
+  const show = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setOpen(true);
+  };
+  const hide = () => {
+    closeTimer.current = setTimeout(() => setOpen(false), 120);
+  };
+  return (
+    <div
+      className="relative"
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
+      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setOpen(false)}
+    >
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((o) => !o)}
+        className={`relative flex items-center gap-1 px-3 py-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
+          active ? "text-ink" : "text-muted hover:text-ink"
+        }`}
+      >
+        {group}
+        <motion.svg viewBox="0 0 20 20" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" animate={{ rotate: open ? 180 : 0 }} transition={spring} aria-hidden>
+          <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+        </motion.svg>
+        {active && <Underline />}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            id={id}
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute top-full left-0 z-30 mt-1 w-80 rounded-xl border border-line bg-surface p-2 shadow-xl"
+          >
+            <ul>
+              {links.map((link) => {
+                const current = isActive(pathname, link.href);
+                return (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      onClick={() => setOpen(false)}
+                      aria-current={current ? "page" : undefined}
+                      className={`group block rounded-lg px-3 py-2.5 transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
+                        current ? "bg-accent-soft" : "hover:bg-canvas"
+                      }`}
+                    >
+                      <span className={`flex items-center justify-between font-medium ${current ? "text-accent" : "text-ink"}`}>
+                        {link.label}
+                        <span aria-hidden className="text-muted opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100">
+                          →
+                        </span>
+                      </span>
+                      <span className="block text-sm text-muted">{link.description}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function DesktopNav({ entries }: { entries: NavEntry[] }) {
+  const { t, asking } = useCivica();
+  const pathname = usePathname();
+  return (
+    <nav aria-label={t.mainMenu} className="hidden md:block">
+      <LayoutGroup id="desktop-nav">
+        <ul className="-ml-3 flex flex-wrap items-center">
+          {entries.map((entry) =>
+            isGroup(entry) ? (
+              <li key={entry.group}>
+                <NavGroup group={entry.group} links={entry.links} pathname={pathname} />
+              </li>
+            ) : (
+              <li key={entry.href}>
+                <Link
+                  href={entry.href}
+                  aria-current={isActive(pathname, entry.href) ? "page" : undefined}
+                  className={`relative flex items-center gap-1.5 px-3 py-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
+                    isActive(pathname, entry.href) ? "text-ink" : "text-muted hover:text-ink"
+                  }`}
+                >
+                  {entry.label}
+                  {entry.href === "/briefing" && asking && !isActive(pathname, "/briefing") && (
+                    <motion.span
+                      className="inline-block size-1.5 rounded-full bg-accent"
+                      animate={{ opacity: [1, 0.3, 1] }}
+                      transition={{ duration: 1.2, repeat: Infinity }}
+                      aria-hidden
+                    />
+                  )}
+                  {isActive(pathname, entry.href) && <Underline />}
+                </Link>
+              </li>
+            ),
+          )}
+        </ul>
+      </LayoutGroup>
+    </nav>
+  );
+}
+
+// Phones and small tablets: the menu slides open beneath the header, grouped
+// the same way as the desktop bar, and closes when you choose a page.
+function MobileNav({ entries, open, onClose }: { entries: NavEntry[]; open: boolean; onClose: () => void }) {
+  const { t } = useCivica();
+  const pathname = usePathname();
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  const link = (item: NavLink) => {
+    const current = isActive(pathname, item.href);
+    return (
+      <li key={item.href}>
+        <Link
+          href={item.href}
+          onClick={onClose}
+          aria-current={current ? "page" : undefined}
+          className={`block rounded-lg px-3 py-2.5 ${current ? "bg-accent-soft text-accent" : "active:bg-canvas"}`}
+        >
+          <span className="block font-medium">{item.label}</span>
+          <span className="block text-sm text-muted">{item.description}</span>
+        </Link>
+      </li>
+    );
+  };
+
+  return (
+    <AnimatePresence initial={false}>
+      {open && (
+        <motion.nav
+          id="mobile-menu"
+          aria-label={t.mainMenu}
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: "auto", opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          className="overflow-hidden border-t border-line md:hidden"
+        >
+          <div className="max-h-[calc(100dvh-5rem)] space-y-4 overflow-y-auto px-4 py-4">
+            <ul className="space-y-0.5">{entries.filter((e): e is NavLink => !isGroup(e) && e.href === "/").map(link)}</ul>
+            {entries.filter(isGroup).map((group) => (
+              <section key={group.group} className="space-y-1">
+                <p className="px-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted">{group.group}</p>
+                <ul className="space-y-0.5">{group.links.map(link)}</ul>
+              </section>
+            ))}
+            <ul className="space-y-0.5 border-t border-line pt-3">{entries.filter((e): e is NavLink => !isGroup(e) && e.href !== "/").map(link)}</ul>
+            <LanguageSelect />
+          </div>
+        </motion.nav>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// A newspaper-style masthead with the navigation along its bottom edge. The
 // tagline folds away once the reader scrolls, so the sticky bar takes less room.
 export function SiteShell({ children }: { children: React.ReactNode }) {
   const { t, result, asking } = useCivica();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [menuOrigin, setMenuOrigin] = useState<MenuOrigin | null>(null);
-  const closeMenu = useCallback(() => setMenuOpen(false), []);
-  // Focus returns to whichever button opened the menu.
-  const menuButton = useRef<HTMLElement | null>(null);
-  const openMenuFrom = useCallback((button: HTMLElement | null) => {
-    menuButton.current = button;
-    const box = button?.getBoundingClientRect();
-    setMenuOrigin(box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : null);
-    setMenuOpen(true);
-  }, []);
-
-  // "M" opens the menu from anywhere, unless the reader is typing.
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key.toLowerCase() !== "m" || event.metaKey || event.ctrlKey || event.altKey) return;
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
-      event.preventDefault();
-      openMenuFrom(document.getElementById("menu-button"));
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [openMenuFrom]);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [compact, setCompact] = useState(false);
   const { scrollY } = useScroll();
   // Two thresholds, so the height change itself can't make it flicker.
   useMotionValueEvent(scrollY, "change", (y) => setCompact((was) => (was ? y > 8 : y > 80)));
-  // "Your briefing" appears once there is one, or one is being researched.
-  const items = navItems(t).filter((item) => item.href !== "/briefing" || asking || result);
+  const entries = navEntries(t, Boolean(asking || result));
 
   return (
     <MotionConfig reducedMotion="user">
@@ -166,82 +284,63 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         <Suspense fallback={null}>
           <IntroGate />
         </Suspense>
-        <header className="sticky top-0 z-20 border-t-4 border-b border-t-accent border-b-line bg-canvas/90 backdrop-blur-md">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-x-6 px-4 py-3 sm:px-6">
-            <div className="flex min-w-0 items-baseline gap-3">
-            <Link href="/" className="min-w-0 text-left">
-              <span className="block font-serif text-3xl font-semibold leading-none tracking-tight">Civica</span>
-              <AnimatePresence initial={false}>
-                {!compact && (
-                  <motion.span
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={softSpring}
-                    className="block overflow-hidden"
-                  >
-                    <span className="block pt-1.5 text-sm text-muted">{t.tagline}</span>
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </Link>
-            <Suspense fallback={null}>
-              <SectionCrumb items={items} />
+        <header className="sticky top-0 z-20 border-t-4 print:hidden border-b border-t-accent border-b-line bg-canvas/90 backdrop-blur-md">
+          <div className="mx-auto max-w-5xl px-4 sm:px-6">
+            <div className="flex items-center justify-between gap-x-6 pt-3 pb-3 md:pb-0">
+              <Link href="/" className="min-w-0 text-left">
+                <span className="block font-serif text-3xl font-semibold leading-none tracking-tight">Civica</span>
+                <AnimatePresence initial={false}>
+                  {!compact && (
+                    <motion.span
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={softSpring}
+                      className="block overflow-hidden"
+                    >
+                      <span className="block pt-1.5 text-sm text-muted">{t.tagline}</span>
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </Link>
+              <div className="flex shrink-0 items-center gap-3">
+                <LanguageSelect className="max-md:hidden" />
+                <button
+                  type="button"
+                  onClick={() => setMobileOpen((o) => !o)}
+                  aria-expanded={mobileOpen}
+                  aria-controls="mobile-menu"
+                  className="flex items-center gap-2 rounded-full border border-line bg-surface py-2 pr-4 pl-3.5 text-sm font-medium shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:hidden"
+                >
+                  <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+                    <motion.path animate={{ d: mobileOpen ? "M5 5l10 10" : "M3 6h14" }} transition={spring} />
+                    <motion.path animate={{ opacity: mobileOpen ? 0 : 1 }} d="M3 10h14" />
+                    <motion.path animate={{ d: mobileOpen ? "M5 15L15 5" : "M9 14h8" }} transition={spring} />
+                  </svg>
+                  {mobileOpen ? t.closeMenu : t.menu}
+                  {asking && !mobileOpen && (
+                    <motion.span
+                      className="inline-block size-1.5 rounded-full bg-accent"
+                      animate={{ opacity: [1, 0.3, 1] }}
+                      transition={{ duration: 1.2, repeat: Infinity }}
+                      aria-hidden
+                    />
+                  )}
+                </button>
+              </div>
+            </div>
+            <Suspense fallback={<div className="hidden h-11 md:block" />}>
+              <DesktopNav entries={entries} />
             </Suspense>
-            </div>
-            <div className="flex shrink-0 items-center gap-3">
-              <LanguageSelect className="max-md:hidden" />
-              <motion.button
-                id="menu-button"
-                type="button"
-                onClick={(event) => openMenuFrom(event.currentTarget)}
-                aria-expanded={menuOpen}
-                aria-controls="site-menu"
-                aria-haspopup="dialog"
-                whileTap={{ scale: 0.96 }}
-                className="flex items-center gap-2 rounded-full border border-line bg-surface py-2 pr-4 pl-3.5 text-sm font-medium shadow-sm transition-colors hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-                  <path d="M3 6h14M3 10h14M9 14h8" />
-                </svg>
-                {t.menu}
-                <Suspense fallback={null}>
-                  <ResearchDot />
-                </Suspense>
-              </motion.button>
-            </div>
           </div>
+          <Suspense fallback={null}>
+            <MobileNav entries={entries} open={mobileOpen} onClose={() => setMobileOpen(false)} />
+          </Suspense>
         </header>
-        {/* The tab on the right edge: the menu is always one click away. */}
-        <motion.button
-          type="button"
-          onClick={(event) => openMenuFrom(event.currentTarget)}
-          aria-label={t.menu}
-          aria-expanded={menuOpen}
-          aria-controls="site-menu"
-          aria-haspopup="dialog"
-          style={{ y: "-50%" }}
-          initial={{ x: 64 }}
-          animate={{ x: menuOpen ? 64 : 0 }}
-          whileHover={{ x: -4 }}
-          whileTap={{ scale: 0.96 }}
-          transition={spring}
-          className="fixed top-1/2 right-0 z-30 hidden flex-col items-center gap-3 rounded-l-2xl bg-accent py-5 pr-3 pl-3.5 text-accent-ink shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:flex"
-        >
-          <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-            <path d="M3 6h14M3 10h14M9 14h8" />
-          </svg>
-          <span aria-hidden className="text-xs font-semibold tracking-[0.2em] uppercase [writing-mode:vertical-rl] [:lang(ko)_&]:tracking-normal">
-            {t.menu}
-          </span>
-        </motion.button>
-        <Suspense fallback={null}>
-          <RoutedMenuSheet open={menuOpen} origin={menuOrigin} onClose={closeMenu} returnFocusTo={menuButton} items={items} />
-        </Suspense>
 
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 sm:py-14">{children}</main>
 
-        <footer className="border-t border-line">
+        <footer className="border-t border-line print:hidden">
           <div className="mx-auto flex max-w-5xl flex-col gap-2 px-4 py-8 text-xs text-muted sm:flex-row sm:justify-between sm:px-6">
             <span className="font-serif text-sm font-semibold text-ink">Civica</span>
             <span className="max-w-xl sm:text-right">{t.disclaimer}</span>

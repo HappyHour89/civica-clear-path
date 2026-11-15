@@ -8,6 +8,7 @@ import type { Dictionary } from "@/lib/i18n";
 import type { Briefing, ForYouItem, Source } from "@/lib/schemas";
 import type { Situation } from "@/lib/situations";
 import { BriefingActions } from "./BriefingActions";
+import { SimplerBox, TermList, TermText } from "./Interactive";
 import { useCivica } from "./CivicaProvider";
 import { FollowUpChat } from "./FollowUpChat";
 import { ProgressBar, softSpring, spring, Stagger, StaggerItem } from "./motion";
@@ -342,6 +343,7 @@ export function ForYou({
 }
 
 export function OverviewSection() {
+  const { result } = useCivica();
   const data = useBriefing();
   if (!data) return null;
   const { t, b, fromDocument, situations } = data;
@@ -351,19 +353,28 @@ export function OverviewSection() {
     : { summary: t.summary, does: t.whatItDoes, matters: t.whyItMatters };
   return (
     <>
-      <Section title={labels.summary}>
-        <p className="font-serif text-xl leading-relaxed">{b.summary}</p>
+      <Section title={labels.summary} note={b.key_terms.length > 0 ? t.termHint : undefined}>
+        <p className="font-serif text-xl leading-relaxed">
+          <TermText text={b.summary} terms={b.key_terms} />
+        </p>
+        {result?.publishToken && (
+          <SimplerBox
+            key={b.title}
+            request={{ briefing: b, question: result.question, language: result.language, token: result.publishToken }}
+            t={t}
+          />
+        )}
       </Section>
       <ForYou b={b} t={t} situations={situations} />
       {fromDocument && <WatchOuts b={b} t={t} />}
       {b.what_it_does.length > 0 && (
         <Section title={labels.does}>
-          <BulletList items={b.what_it_does} />
+          <TermList items={b.what_it_does} terms={b.key_terms} />
         </Section>
       )}
       {b.why_it_matters.length > 0 && (
         <Section title={labels.matters}>
-          <BulletList items={b.why_it_matters} />
+          <TermList items={b.why_it_matters} terms={b.key_terms} />
         </Section>
       )}
       {b.key_facts.length > 0 && (

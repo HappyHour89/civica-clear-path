@@ -7,7 +7,7 @@ import { ChargeSchema } from "@/lib/schemas";
 import { parseSituations } from "@/lib/situations";
 import { normalizeUrl, verifySources } from "@/lib/sources";
 import { isStateCode } from "@/lib/states";
-import { fileToContentBlock } from "@/lib/upload";
+import { fileToContentBlock, readUpload } from "@/lib/upload";
 
 export const maxDuration = 300;
 
@@ -38,10 +38,10 @@ export async function POST(request: Request) {
     const state = form.get("state");
     const note = String(form.get("note") ?? "").trim().slice(0, MAX_NOTE_CHARS);
 
-    const file = form.get("file");
+    const file = await readUpload(form, "file");
     const text = String(form.get("text") ?? "").trim();
     let document: Anthropic.Beta.BetaContentBlockParam;
-    if (file instanceof File && file.size > 0) {
+    if (file) {
       document = await fileToContentBlock(file);
     } else if (text) {
       if (text.length > MAX_PASTED_CHARS) throw new CivicaError("That text is too long. Paste just the bill.", 413);

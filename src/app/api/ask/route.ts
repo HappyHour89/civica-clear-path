@@ -8,7 +8,7 @@ import { signBriefing } from "@/lib/publicPages";
 import { parseSituations } from "@/lib/situations";
 import { isSafeHttpUrl, verifySources } from "@/lib/sources";
 import { isStateCode } from "@/lib/states";
-import { fileToContentBlock } from "@/lib/upload";
+import { fileToContentBlock, readUpload } from "@/lib/upload";
 
 export const maxDuration = 300;
 
@@ -27,18 +27,18 @@ export async function POST(request: Request) {
     const question = String(form.get("question") ?? "").trim();
     const language = form.get("language");
     const state = form.get("state");
-    const file = form.get("file");
+    const file = await readUpload(form, "file");
     const situations = parseSituations(form.get("situations"));
 
     if (!isLanguage(language)) throw new CivicaError("Unsupported language.", 400);
     if (question.length > MAX_QUESTION_CHARS) {
       throw new CivicaError(`Questions must be under ${MAX_QUESTION_CHARS} characters.`, 400);
     }
-    const hasFile = file instanceof File && file.size > 0;
+    const hasFile = file !== null;
     if (!question && !hasFile) throw new CivicaError("Type a question or upload a file.", 400);
 
     const content: Anthropic.Beta.BetaContentBlockParam[] = [];
-    if (hasFile) content.push(await fileToContentBlock(file));
+    if (file) content.push(await fileToContentBlock(file));
     content.push({
       type: "text",
       text: [

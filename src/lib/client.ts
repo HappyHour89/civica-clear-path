@@ -1,4 +1,6 @@
 import type { Dictionary, Language } from "./i18n";
+import { attachFile } from "./uploadClient";
+import { DIRECT_UPLOAD_BYTES } from "./uploadLimits";
 import type { OfficialsResult } from "./officials";
 import type { Bill, Briefing, ChargeReport, Comparison, FollowUp } from "./schemas";
 
@@ -35,7 +37,7 @@ export async function askQuestion(
   form.set("language", input.language);
   form.set("state", input.state);
   if (input.situations.length) form.set("situations", input.situations.join(","));
-  if (input.file) form.set("file", input.file);
+  if (input.file) await attachFile(form, "file", input.file, t);
   form.set("stream", "1");
   const response = await fetch("/api/ask", { method: "POST", body: form });
   const streamed = response.headers.get("Content-Type")?.includes("ndjson");
@@ -132,7 +134,7 @@ export async function compareVersions(
 ) {
   const form = new FormData();
   for (const [name, side] of [["before", input.before], ["after", input.after]] as const) {
-    if (side.file) form.set(name, side.file);
+    if (side.file) await attachFile(form, name, side.file, t, DIRECT_UPLOAD_BYTES / 2);
     else form.set(`${name}Text`, side.text);
   }
   form.set("language", input.language);
@@ -156,7 +158,7 @@ export async function explainCharges(
   t: Dictionary,
 ) {
   const form = new FormData();
-  if (input.file) form.set("file", input.file);
+  if (input.file) await attachFile(form, "file", input.file, t);
   else form.set("text", input.text);
   form.set("note", input.note);
   form.set("language", input.language);

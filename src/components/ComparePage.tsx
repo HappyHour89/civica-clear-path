@@ -11,7 +11,7 @@ import { useCivica } from "./CivicaProvider";
 import { Button, Collapse, ProgressBar, Reveal, softSpring, spring } from "./motion";
 import { BulletList, cardClass, Eyebrow, inputClass, PageIntro, Section, SourceList } from "./ui";
 
-const MAX_TOTAL_BYTES = 4 * 1024 * 1024;
+import { MAX_UPLOAD_BYTES as MAX_TOTAL_BYTES } from "@/lib/uploadLimits";
 const MAX_PASTED = 60_000;
 
 type Change = Comparison["changes"][number];

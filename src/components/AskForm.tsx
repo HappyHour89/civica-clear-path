@@ -10,7 +10,7 @@ import { Button, Collapse, ProgressBar, Reveal, Stagger, StaggerItem } from "./m
 import { ResearchLive } from "./ResearchLive";
 import { cardClass, inputClass, PageIntro } from "./ui";
 
-const MAX_FILE_BYTES = 4 * 1024 * 1024;
+import { MAX_UPLOAD_BYTES as MAX_FILE_BYTES } from "@/lib/uploadLimits";
 
 // Sends the question and opens the briefing, unless the user has since moved
 // to another page while it was being researched.

@@ -12,7 +12,7 @@ import { useCivica } from "./CivicaProvider";
 import { Button, Collapse, ProgressBar, Reveal, softSpring, spring, Stagger, StaggerItem } from "./motion";
 import { BulletList, cardClass, Eyebrow, ExternalLink, inputClass, PageIntro, Section, SourceList } from "./ui";
 
-const MAX_FILE_BYTES = 4 * 1024 * 1024;
+import { MAX_UPLOAD_BYTES as MAX_FILE_BYTES } from "@/lib/uploadLimits";
 
 type Item = ChargeReport["line_items"][number];
 

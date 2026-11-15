@@ -16,6 +16,7 @@ import {
 import { parseSituations } from "./situations";
 import { wrapText } from "./shareCard";
 import { describeRequestContext } from "./prompts";
+import { browserLanguage, DICTIONARIES, LANGUAGES, type Language } from "./i18n";
 import { sampleBill, sampleBriefing, sampleComparison } from "./testFixtures";
 import { billKey, detectUpdate, trackPosition } from "./followedBills";
 import { fileToContentBlock } from "./upload";
@@ -307,5 +308,34 @@ describe("followed bills", () => {
     expect(trackPosition("enacted")).toBe(5);
     expect(trackPosition("vetoed")).toBe(4);
     expect(trackPosition("unknown")).toBe(-1);
+  });
+});
+
+describe("languages", () => {
+  it("opens in the reader's browser language when Civica has it", () => {
+    expect(browserLanguage("es-MX")).toBe("es");
+    expect(browserLanguage("zh-CN")).toBe("zh-Hans");
+    expect(browserLanguage("zh-TW")).toBe("zh-Hant");
+    expect(browserLanguage("zh-Hant-HK")).toBe("zh-Hant");
+    expect(browserLanguage("fil-PH")).toBe("tl");
+    expect(browserLanguage("vi")).toBe("vi");
+    expect(browserLanguage("fr-FR")).toBeNull();
+    expect(browserLanguage("constructor")).toBeNull();
+  });
+
+  it("has every string in every language, with nothing left empty", () => {
+    const shape = (value: unknown): unknown =>
+      Array.isArray(value) ? value.length : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, shape(v)])) : typeof value;
+    const empty = (value: unknown): boolean =>
+      typeof value === "string" ? value.trim() === "" : Array.isArray(value) ? value.some(empty) : value && typeof value === "object" ? Object.values(value).some(empty) : false;
+    for (const code of Object.keys(LANGUAGES) as Language[]) {
+      expect(shape(DICTIONARIES[code]), code).toEqual(shape(DICTIONARIES.en));
+      expect(empty(DICTIONARIES[code]), code).toBe(false);
+    }
+  });
+
+  it("tells the AI which language to write in", () => {
+    const context = describeRequestContext({ language: "zh-Hant", state: null, today: "2026-11-15" });
+    expect(context).toContain("Answer in: Traditional Chinese (繁體中文)");
   });
 });

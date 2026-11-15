@@ -169,7 +169,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-20 border-t-4 border-b border-t-accent border-b-line bg-canvas/90 backdrop-blur-md">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-x-6 px-4 py-3 sm:px-6">
             <div className="flex min-w-0 items-baseline gap-3">
-            <Link href="/" className="shrink-0 text-left">
+            <Link href="/" className="min-w-0 text-left">
               <span className="block font-serif text-3xl font-semibold leading-none tracking-tight">Civica</span>
               <AnimatePresence initial={false}>
                 {!compact && (

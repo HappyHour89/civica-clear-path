@@ -1,6 +1,6 @@
 import type { Dictionary, Language } from "./i18n";
 import type { OfficialsResult } from "./officials";
-import type { Bill, Briefing, Comparison, FollowUp } from "./schemas";
+import type { Bill, Briefing, ChargeReport, Comparison, FollowUp } from "./schemas";
 
 export type ChatTurn = { role: "user" | "assistant"; content: string; sources?: FollowUp["sources"] };
 
@@ -111,4 +111,19 @@ export async function lookUpBill(query: string, language: Language, state: strin
     body: JSON.stringify({ query, language, state: state || null }),
   });
   return (await readJson<{ bill: Bill }>(response, t, language)).bill;
+}
+
+export async function explainCharges(
+  input: { file: File | null; text: string; note: string; language: Language; state: string; situations: string[] },
+  t: Dictionary,
+) {
+  const form = new FormData();
+  if (input.file) form.set("file", input.file);
+  else form.set("text", input.text);
+  form.set("note", input.note);
+  form.set("language", input.language);
+  form.set("state", input.state);
+  if (input.situations.length) form.set("situations", input.situations.join(","));
+  const response = await fetch("/api/charges", { method: "POST", body: form });
+  return (await readJson<{ report: ChargeReport }>(response, t, input.language)).report;
 }

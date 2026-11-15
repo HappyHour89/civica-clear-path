@@ -1,4 +1,4 @@
-import type { Bill, Briefing, Comparison } from "./schemas";
+import type { Bill, Briefing, ChargeReport, Comparison } from "./schemas";
 
 export const sampleBriefing: Briefing = {
   in_scope: true,
@@ -128,6 +128,66 @@ export const sampleBill: Bill = {
       publisher: "Congress.gov",
       source_type: "government",
       published: "",
+      excerpt: "",
+    },
+  ],
+};
+
+export const sampleCharges: ChargeReport = {
+  in_scope: true,
+  out_of_scope_message: "",
+  document_kind: "Water and sewer bill",
+  issuer: "City of Example Public Utilities",
+  period: "Sep 1 - Oct 31, 2026",
+  total: "$142.18",
+  summary: "Most of this bill is fixed charges and water rates the city council raised in 2025.",
+  line_items: [
+    {
+      label: "Water base fee",
+      amount: "$38.50",
+      what_it_is: "A fixed monthly charge for keeping the system running.",
+      origin: "public_decision",
+      decided_by: "Example City Council",
+      decision: "Approved yearly water rate increases for 2025-2029.",
+      decision_date: "2025-06-10",
+      vote: "7-2",
+      changed_recently: true,
+      change_note: "Up 9% from last year.",
+      source_ids: [1, 4],
+    },
+    {
+      label: "Water use",
+      amount: "$61.20",
+      what_it_is: "The water you used, priced per unit.",
+      origin: "usage",
+      decided_by: "",
+      decision: "",
+      decision_date: "",
+      vote: "",
+      changed_recently: false,
+      change_note: "",
+      source_ids: [],
+    },
+  ],
+  who_decides: [
+    {
+      body: "Example City Council",
+      controls: "Water and sewer rates.",
+      next_meeting: "2026-12-02",
+      how_to_weigh_in: "Speak during public comment or email the clerk.",
+      url: "https://www.example.gov/council",
+    },
+  ],
+  for_you: [],
+  questions_to_consider: ["Is a lower-income discount available?"],
+  sources: [
+    {
+      id: 1,
+      title: "Water rates 2025-2029",
+      url: "https://www.example.gov/water-rates",
+      publisher: "City of Example",
+      source_type: "government",
+      published: "2025-06-11",
       excerpt: "",
     },
   ],

@@ -13,6 +13,7 @@ import { softSpring, spring } from "./motion";
 function navItems(t: Dictionary) {
   return [
     { href: "/", label: t.navAsk, description: t.navAskDesc },
+    { href: "/charges", label: t.navCharges, description: t.navChargesDesc },
     { href: "/document", label: t.navDocument, description: t.navDocumentDesc },
     { href: "/compare", label: t.navCompare, description: t.navCompareDesc },
     { href: "/bills", label: t.navBills, description: t.navBillsDesc },

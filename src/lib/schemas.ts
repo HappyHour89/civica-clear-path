@@ -206,10 +206,60 @@ export const BillSchema = z.strictObject({
   sources: z.array(SourceSchema),
 });
 
+export const CHARGE_ORIGINS = ["public_decision", "tax", "regulated_rate", "usage", "contract", "company_fee", "unclear"] as const;
+
+// "Why is my bill this high?": a bill, notice, or statement, with each charge
+// traced to the public decision behind it.
+export const ChargeSchema = z.strictObject({
+  in_scope: z.boolean().describe("False if the upload is not a bill, notice, statement, or fee document."),
+  out_of_scope_message: z.string().describe("If in_scope is false, a short polite note. Otherwise empty."),
+  document_kind: z.string().describe("Plain name of the document, e.g. 'Water and sewer bill' or 'Rent increase notice'."),
+  issuer: z.string().describe("The organization that sent it. Never a private person's name."),
+  period: z.string().describe("Billing period or effective date as printed, or empty."),
+  total: z.string().describe("Total amount due as printed, or empty."),
+  summary: z.string().describe("2-3 plain sentences: what this document charges for and what drives the amount."),
+  line_items: z
+    .array(
+      z.strictObject({
+        label: z.string().describe("The charge's name as printed."),
+        amount: z.string().describe("The amount as printed, or empty."),
+        what_it_is: z.string().describe("One plain sentence on what this charge pays for."),
+        origin: z
+          .enum(CHARGE_ORIGINS)
+          .describe(
+            "public_decision: set by a public body's vote (city council, water district board, school board, rent board); tax: a tax rate set by law or voters; regulated_rate: set by a company but approved by a regulator (e.g. a state utilities commission); usage: depends on how much the person used; contract: set by a private agreement; company_fee: set by a private company alone; unclear.",
+          ),
+        decided_by: z.string().describe("The public body or regulator that set or approved it, or empty."),
+        decision: z.string().describe("What that body decided, in plain words (e.g. 'Approved yearly water rate increases for 2025-2029'), or empty."),
+        decision_date: z.string().describe("Date of that decision, YYYY-MM-DD, or empty if not verified."),
+        vote: z.string().describe("The vote count if found (e.g. '7-2'), or empty. Never guess."),
+        changed_recently: z.boolean().describe("True if this charge rose or was added within the last two years, per your sources."),
+        change_note: z.string().describe("If changed_recently, what changed and by how much. Otherwise empty."),
+        source_ids: z.array(z.number().int()).describe("ids from `sources` supporting the decision."),
+      }),
+    )
+    .describe("Each meaningful charge, in the order printed. Merge tiny lines that belong together."),
+  who_decides: z
+    .array(
+      z.strictObject({
+        body: z.string().describe("Name of the public body or regulator."),
+        controls: z.string().describe("Which charges it controls."),
+        next_meeting: z.string().describe("Date of its next meeting or hearing if found (YYYY-MM-DD), or empty."),
+        how_to_weigh_in: z.string().describe("How a member of the public can comment or take part, in plain steps."),
+        url: z.string().describe("Its official page from your searches, or empty."),
+      }),
+    )
+    .describe("The public bodies behind these charges, and how to reach them."),
+  for_you: z.array(ForYouItemSchema).describe("What this means for the reader's situations, if any are listed."),
+  questions_to_consider: z.array(z.string()).describe("Questions that help the reader decide what to do next. Never leading."),
+  sources: z.array(SourceSchema),
+});
+
 export type Source = z.infer<typeof SourceSchema>;
 export type Briefing = z.infer<typeof BriefingSchema>;
 export type Comparison = z.infer<typeof CompareSchema>;
 export type Bill = z.infer<typeof BillSchema>;
+export type ChargeReport = z.infer<typeof ChargeSchema>;
 export type ForYouItem = z.infer<typeof ForYouItemSchema>;
 export type FollowUp = z.infer<typeof FollowUpSchema>;
 

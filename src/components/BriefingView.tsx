@@ -153,7 +153,7 @@ function useBriefing(): { t: Dictionary; b: Briefing; fromDocument: boolean; sit
 // A claim with numbered footnotes. Clicking a number opens that source
 // inline: type, date, quoted passage, and a link to the full list. `labels`
 // sit under the text (evidence level, disputed, certainty).
-function Claim(props: { text: string; sourceIds: number[]; b: { sources: Source[] }; t: Dictionary; labels?: React.ReactNode }) {
+export function Claim(props: { text: string; sourceIds: number[]; b: { sources: Source[] }; t: Dictionary; labels?: React.ReactNode }) {
   const { b, t } = props;
   const [open, setOpen] = useState<number | null>(null);
   const cited = b.sources.filter((s) => props.sourceIds.includes(s.id));

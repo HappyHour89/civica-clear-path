@@ -162,6 +162,7 @@ async function researchWithTools<T>(
   const messages = [...options.messages];
   const searchedUrls = new Set<string>();
   const pageAges = new Map<string, string>();
+  const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, searches: 0 };
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const params = buildRequest(provider, { ...options, messages }, level);
@@ -169,6 +170,7 @@ async function researchWithTools<T>(
       ? await streamRound(client, params, options.toolName, options.onProgress)
       : await client.beta.messages.create(params);
     collectSearchResultUrls(response.content, searchedUrls, pageAges);
+    addUsage(usage, response.usage);
 
     if (response.stop_reason === "refusal") {
       throw new CivicaError("This request couldn't be answered. Try rephrasing your question.", 422);
@@ -184,6 +186,7 @@ async function researchWithTools<T>(
         console.error("Claude returned an invalid answer shape", parsed.error.issues);
         throw new CivicaError("The answer came back in an unexpected format. Please try again.", 502);
       }
+      logUsage(provider, options.toolName, usage);
       return { data: parsed.data, searchedUrls, pageAges };
     }
 
@@ -203,6 +206,32 @@ async function researchWithTools<T>(
   }
 
   throw new CivicaError("Research took too many steps. Please try again.", 504);
+}
+
+type UsageTotals = { input: number; output: number; cacheRead: number; cacheWrite: number; searches: number };
+
+function addUsage(totals: UsageTotals, usage: Anthropic.Beta.BetaUsage | undefined) {
+  if (!usage) return;
+  totals.input += usage.input_tokens ?? 0;
+  totals.output += usage.output_tokens ?? 0;
+  totals.cacheRead += usage.cache_read_input_tokens ?? 0;
+  totals.cacheWrite += usage.cache_creation_input_tokens ?? 0;
+  totals.searches += usage.server_tool_use?.web_search_requests ?? 0;
+}
+
+// Claude Opus 5.5 list prices in US dollars: per million tokens, and per search.
+const PRICES = { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5, search: 0.01 };
+
+// One line per answered request in Vercel > Logs ("AI usage"), so the real
+// cost of each feature can be checked.
+function logUsage(provider: Provider, feature: string, u: UsageTotals) {
+  const cost =
+    provider.name === "anthropic"
+      ? (u.input * PRICES.input + u.output * PRICES.output + u.cacheRead * PRICES.cacheRead + u.cacheWrite * PRICES.cacheWrite) /
+          1_000_000 +
+        u.searches * PRICES.search
+      : null;
+  console.info("AI usage", { feature, model: provider.model, ...u, estimatedUsd: cost === null ? null : Number(cost.toFixed(4)) });
 }
 
 // Same request as messages.create, but streamed so each search, each source

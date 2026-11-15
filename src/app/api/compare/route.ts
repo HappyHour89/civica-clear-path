@@ -7,7 +7,7 @@ import { CompareSchema } from "@/lib/schemas";
 import { parseSituations } from "@/lib/situations";
 import { verifySources } from "@/lib/sources";
 import { isStateCode } from "@/lib/states";
-import { fileToContentBlock, MAX_UPLOAD_BYTES } from "@/lib/upload";
+import { fileToContentBlock, MAX_UPLOAD_BYTES, readUpload } from "@/lib/upload";
 
 export const maxDuration = 300;
 
@@ -23,8 +23,8 @@ const INSTRUCTIONS = `The user gave two versions of the same document: VERSION A
 type Side = { block: Anthropic.Beta.BetaContentBlockParam; bytes: number };
 
 async function readSide(form: FormData, name: "before" | "after"): Promise<Side | null> {
-  const file = form.get(name);
-  if (file instanceof File && file.size > 0) return { block: await fileToContentBlock(file), bytes: file.size };
+  const file = await readUpload(form, name);
+  if (file) return { block: await fileToContentBlock(file), bytes: file.size };
   const text = String(form.get(`${name}Text`) ?? "").trim();
   if (!text) return null;
   if (text.length > MAX_PASTED_CHARS) {
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     const [before, after] = await Promise.all([readSide(form, "before"), readSide(form, "after")]);
     if (!before || !after) throw new CivicaError("Add both versions: the older one and the newer one.", 400);
     if (before.bytes + after.bytes > MAX_UPLOAD_BYTES) {
-      throw new CivicaError("Together the two versions must be 4 MB or smaller.", 413);
+      throw new CivicaError("Together the two versions must be 20 MB or smaller.", 413);
     }
 
     const content: Anthropic.Beta.BetaContentBlockParam[] = [

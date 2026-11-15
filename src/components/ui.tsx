@@ -37,7 +37,19 @@ export function BulletList({ items }: { items: string[] }) {
   );
 }
 
+// Only http(s) links are rendered as links. Many come from AI answers that
+// read web pages, so anything else (javascript:, data:, ...) shows as text.
+function isWebUrl(value: string) {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === "https:" || protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 export function ExternalLink(props: { href: string; children: React.ReactNode; className?: string }) {
+  if (!isWebUrl(props.href)) return <span className={props.className}>{props.children}</span>;
   return (
     <a
       href={props.href}

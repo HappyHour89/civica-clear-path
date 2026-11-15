@@ -175,7 +175,7 @@ describe("uploads", () => {
   it("rejects unknown binary files, empty files, and oversized files", async () => {
     await expect(fileToContentBlock(new File([new Uint8Array([0xff, 0xfe, 0x00, 0xc3])], "x.bin"))).rejects.toMatchObject({ status: 415 });
     await expect(fileToContentBlock(new File([], "empty.txt"))).rejects.toMatchObject({ status: 400 });
-    await expect(fileToContentBlock(new File([new Uint8Array(4 * 1024 * 1024 + 1)], "big.txt"))).rejects.toMatchObject({ status: 413 });
+    await expect(fileToContentBlock(new File([new Uint8Array(20 * 1024 * 1024 + 1)], "big.txt"))).rejects.toMatchObject({ status: 413 });
   });
 });
 

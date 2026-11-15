@@ -4,10 +4,11 @@ import { Messages as StandardMessages } from "@anthropic-ai/sdk/resources/messag
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as askRoute } from "../app/api/ask/route";
 import { POST as billRoute } from "../app/api/bill/route";
+import { POST as chargesRoute } from "../app/api/charges/route";
 import { POST as compareRoute } from "../app/api/compare/route";
 import { CivicaError, parseJsonAnswer, research, resetProviderStateForTests } from "./claude";
 import { BriefingSchema, FollowUpSchema } from "./schemas";
-import { sampleBill, sampleBriefing, sampleComparison } from "./testFixtures";
+import { sampleBill, sampleBriefing, sampleCharges, sampleComparison } from "./testFixtures";
 
 type FakeMessage = { stop_reason: string; content: unknown[] };
 
@@ -601,5 +602,46 @@ describe("POST /api/bill", () => {
 
   it("rejects an empty request", async () => {
     expect((await billRoute(billRequest({ query: " ", language: "en" }, "10.4.0.3"))).status).toBe(400);
+  });
+});
+
+describe("POST /api/charges", () => {
+  beforeEach(() => {
+    resetProviderStateForTests();
+    process.env.ANTHROPIC_API_KEY = "test-key";
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const chargeRequest = (fields: Record<string, string | Blob>, ip: string) => {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(fields)) form.set(key, value);
+    return new Request("http://localhost/api/charges", { method: "POST", body: form, headers: { "x-forwarded-for": ip } });
+  };
+
+  it("sends the bill with privacy rules, and keeps only verified citations and links", async () => {
+    const spy = mockResponses({
+      stop_reason: "tool_use",
+      content: [searchResult("https://www.example.gov/water-rates"), toolCall("submit_charge_report", sampleCharges)],
+    });
+    const bill = new File(["%PDF-1.7 water"], "water-bill.pdf", { type: "application/pdf" });
+    const response = await chargesRoute(
+      chargeRequest({ file: bill, note: "It went up $40", language: "en", state: "CA" }, "10.5.0.1"),
+    );
+    expect(response.status).toBe(200);
+    const { report } = await response.json();
+    expect(report.line_items[0].source_ids).toEqual([1]);
+    expect(report.who_decides[0].url).toBe("");
+
+    const params = spy.mock.calls[0][0] as unknown as { messages: { content: { type: string; text?: string; title?: string }[] }[] };
+    const [document, request] = params.messages[0].content;
+    expect(document).toMatchObject({ type: "document", title: "water-bill.pdf" });
+    expect(request.text).toContain("never repeat the person's name, street address, account number");
+    expect(request.text).toContain("<reader_note>\nIt went up $40\n</reader_note>");
+  });
+
+  it("needs a bill", async () => {
+    expect((await chargesRoute(chargeRequest({ note: "hi", language: "en" }, "10.5.0.2"))).status).toBe(400);
   });
 });

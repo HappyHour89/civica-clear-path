@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { findOfficials, parseCensusDistrict, parseLegislators } from "./officials";
 import { checkRateLimit } from "./rateLimit";
-import { BillSchema, BriefingSchema, CompareSchema, type Source, toolInputSchema } from "./schemas";
+import { BillSchema, BriefingSchema, ChargeSchema, CompareSchema, type Source, toolInputSchema } from "./schemas";
 import {
   absoluteDate,
   collectSearchResultUrls,
@@ -33,6 +33,7 @@ describe("toolInputSchema", () => {
     ["briefing", BriefingSchema],
     ["comparison", CompareSchema],
     ["bill", BillSchema],
+    ["charges", ChargeSchema],
   ])("produces a %s schema Claude's strict mode accepts", (_, schema) => {
     walk(toolInputSchema(schema), (obj) => {
       expect(obj).not.toHaveProperty("$schema");

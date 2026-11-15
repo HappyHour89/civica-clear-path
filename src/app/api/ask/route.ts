@@ -4,6 +4,7 @@ import { enforceRateLimit, errorResponse, todayIso } from "@/lib/http";
 import { isLanguage } from "@/lib/i18n";
 import { describeRequestContext } from "@/lib/prompts";
 import { BriefingSchema } from "@/lib/schemas";
+import { signBriefing } from "@/lib/publicPages";
 import { parseSituations } from "@/lib/situations";
 import { isSafeHttpUrl, verifySources } from "@/lib/sources";
 import { isStateCode } from "@/lib/states";
@@ -80,7 +81,9 @@ export async function POST(request: Request) {
       })),
       helpful_websites: data.helpful_websites.filter((site) => isSafeHttpUrl(site.url)),
     };
-    return Response.json({ briefing });
+    // Typed questions can be published as public pages; uploads never can.
+    const publishToken = !hasFile && briefing.in_scope ? signBriefing({ briefing, question, language }) : null;
+    return Response.json({ briefing, publishToken });
   } catch (error) {
     return errorResponse(error);
   }

@@ -16,6 +16,10 @@ export type BriefingResult = {
   situations: Situation[];
   briefing: Briefing;
   fromDocument: boolean;
+  // Present when this briefing can be published as a public page.
+  publishToken: string | null;
+  // The language the briefing was written in.
+  language: Language;
 };
 
 export type ComparisonResult = { comparison: Comparison; situations: Situation[]; names: { before: string; after: string } };
@@ -140,11 +144,19 @@ export function CivicaProvider({ children }: { children: React.ReactNode }) {
       const officialsRequest =
         state && officials?.state !== state ? lookUpOfficials(state, "") : Promise.resolve();
       try {
-        const [briefing] = await Promise.all([
+        const [{ briefing, publishToken }] = await Promise.all([
           askQuestion({ question: input.question, file: input.file, language, state, situations }, t),
           officialsRequest,
         ]);
-        setResult({ question: input.question, state, situations, briefing, fromDocument: input.file !== null });
+        setResult({
+          question: input.question,
+          state,
+          situations,
+          briefing,
+          fromDocument: input.file !== null,
+          publishToken,
+          language,
+        });
         setTurns([]);
         return true;
       } catch (e) {

@@ -414,9 +414,10 @@ describe("POST /api/ask", () => {
     const response = await askRoute(
       askRequest({ question: "What is the filibuster?", language: "ko", state: "CA" }, "10.0.0.1"),
     );
-    const { briefing } = await response.json();
+    const { briefing, publishToken } = await response.json();
 
     expect(response.status).toBe(200);
+    expect(publishToken).toEqual(expect.any(String));
     expect(briefing.sources.map((s: { id: number }) => s.id)).toEqual([1]);
     expect(briefing.key_facts[1].source_ids).toEqual([]);
     expect(briefing.helpful_websites).toHaveLength(1);
@@ -472,11 +473,12 @@ describe("POST /api/ask", () => {
     expect(response.status).toBe(400);
   });
 
-  it("sends an uploaded PDF to Claude as a document", async () => {
+  it("sends an uploaded PDF to Claude as a document, and never offers to publish it", async () => {
     const spy = mockResponses({ stop_reason: "tool_use", content: [toolCall("submit_briefing", sampleBriefing)] });
     const pdf = new File(["%PDF-1.7 fake"], "bill.pdf", { type: "application/pdf" });
     const response = await askRoute(askRequest({ question: "", language: "en", file: pdf }, "10.0.0.4"));
     expect(response.status).toBe(200);
+    expect((await response.json()).publishToken).toBeNull();
     const params = spy.mock.calls[0][0] as unknown as { messages: { content: { type: string; title?: string }[] }[] };
     expect(params.messages[0].content[0]).toMatchObject({ type: "document", title: "bill.pdf" });
   });

@@ -3,7 +3,7 @@
 import { AnimatePresence, MotionConfig, motion, useMotionValueEvent, useScroll } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { LANGUAGES, type Dictionary, type Language } from "@/lib/i18n";
 import { useCivica } from "./CivicaProvider";
 import { Intro } from "./Intro";
@@ -19,6 +19,7 @@ function navItems(t: Dictionary) {
     { href: "/bills", label: t.navBills, description: t.navBillsDesc },
     { href: "/representatives", label: t.navRepresentatives, description: t.navRepresentativesDesc },
     { href: "/briefing", label: t.navBriefing, description: t.navBriefingDesc },
+    { href: "/library", label: t.navLibrary, description: t.navLibraryDesc },
     { href: "/about", label: t.navAbout, description: t.navAboutDesc },
     { href: "/support", label: t.navSupport, description: t.navSupportDesc },
   ];
@@ -28,12 +29,106 @@ export function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
+// Everything below reads the URL. Each piece sits in its own Suspense
+// boundary, so pages whose URL isn't known at build time (like /p/[slug])
+// can still prerender the rest of the masthead.
+
+// The opening animation plays when a visit starts on the home page, not every
+// time someone navigates back to it.
+function IntroGate() {
+  const pathname = usePathname();
+  const [active, setActive] = useState(pathname === "/");
+  if (active && pathname !== "/") setActive(false);
+  return active ? <Intro /> : null;
+}
+
+// Which section you're in, sliding in as you move between them.
+function SectionCrumb({ items }: { items: { href: string; label: string }[] }) {
+  const pathname = usePathname();
+  const current = items.find((item) => isActive(pathname, item.href));
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      {current && current.href !== "/" && (
+        <motion.span
+          key={current.href}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={softSpring}
+          className="hidden truncate font-serif text-lg text-muted sm:block"
+        >
+          <span aria-hidden className="mr-3 text-line">/</span>
+          {current.label}
+        </motion.span>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// A pulsing dot on the Menu button while a briefing is being researched.
+function ResearchDot() {
+  const { asking } = useCivica();
+  const pathname = usePathname();
+  if (!asking || isActive(pathname, "/briefing")) return null;
+  return (
+    <motion.span
+      className="inline-block size-1.5 rounded-full bg-accent"
+      animate={{ opacity: [1, 0.3, 1] }}
+      transition={{ duration: 1.2, repeat: Infinity }}
+      aria-hidden
+    />
+  );
+}
+
+function RoutedMenuSheet(props: Omit<React.ComponentProps<typeof MenuSheet>, "items"> & { items: ReturnType<typeof navItems> }) {
+  const { asking } = useCivica();
+  const pathname = usePathname();
+  return (
+    <MenuSheet
+      {...props}
+      items={props.items.map((item) => ({
+        ...item,
+        active: isActive(pathname, item.href),
+        badge: item.href === "/briefing" && asking && !isActive(pathname, item.href),
+      }))}
+    />
+  );
+}
+
+// A native menu: it works the same with a mouse, a keyboard, a screen reader,
+// and on phones, and scales to any number of languages.
+export function LanguageSelect({ className = "" }: { className?: string }) {
+  const { t, language, setLanguage } = useCivica();
+  return (
+    <label className={`relative inline-flex items-center ${className}`}>
+      <span className="sr-only">{t.languageLabel}</span>
+      <svg viewBox="0 0 20 20" className="pointer-events-none absolute left-2.5 size-4 text-muted" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+        <circle cx="10" cy="10" r="7" />
+        <path d="M3 10h14M10 3c2 2.2 2.8 4.5 2.8 7s-.8 4.8-2.8 7c-2-2.2-2.8-4.5-2.8-7S8 5.2 10 3z" />
+      </svg>
+      <select
+        value={language}
+        onChange={(e) => setLanguage(e.target.value as Language)}
+        className="h-9 appearance-none rounded-full border border-line bg-surface pr-8 pl-8 text-sm font-medium text-ink transition-colors hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        {(Object.keys(LANGUAGES) as Language[]).map((code) => (
+          <option key={code} value={code} lang={code}>
+            {LANGUAGES[code].label}
+          </option>
+        ))}
+      </select>
+      <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-2.5 size-3.5 text-muted" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </label>
+  );
+}
+
 // A newspaper-style masthead with the section you're in, and a pop-up menu
 // opened from the Menu button, the tab on the right edge, or the M key. The
 // tagline folds away once the reader scrolls, so the sticky bar takes less room.
 export function SiteShell({ children }: { children: React.ReactNode }) {
-  const { t, language, setLanguage, result, asking } = useCivica();
-  const pathname = usePathname();
+  const { t, result, asking } = useCivica();
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuOrigin, setMenuOrigin] = useState<MenuOrigin | null>(null);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
@@ -62,19 +157,15 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const { scrollY } = useScroll();
   // Two thresholds, so the height change itself can't make it flicker.
   useMotionValueEvent(scrollY, "change", (y) => setCompact((was) => (was ? y > 8 : y > 80)));
-  // The opening animation plays when a visit starts on the home page, not
-  // every time someone navigates back to it.
-  const [introActive, setIntroActive] = useState(pathname === "/");
-  if (introActive && pathname !== "/") setIntroActive(false);
   // "Your briefing" appears once there is one, or one is being researched.
   const items = navItems(t).filter((item) => item.href !== "/briefing" || asking || result);
-
-  const current = items.find((item) => isActive(pathname, item.href));
 
   return (
     <MotionConfig reducedMotion="user">
       <div className="flex flex-1 flex-col">
-        {introActive && <Intro />}
+        <Suspense fallback={null}>
+          <IntroGate />
+        </Suspense>
         <header className="sticky top-0 z-20 border-t-4 border-b border-t-accent border-b-line bg-canvas/90 backdrop-blur-md">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-x-6 px-4 py-3 sm:px-6">
             <div className="flex min-w-0 items-baseline gap-3">
@@ -94,41 +185,12 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 )}
               </AnimatePresence>
             </Link>
-            {/* Which section you're in, sliding in as you move between them. */}
-            <AnimatePresence mode="wait" initial={false}>
-              {current && current.href !== "/" && (
-                <motion.span
-                  key={current.href}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={softSpring}
-                  className="hidden truncate font-serif text-lg text-muted sm:block"
-                >
-                  <span aria-hidden className="mr-3 text-line">/</span>
-                  {current.label}
-                </motion.span>
-              )}
-            </AnimatePresence>
+            <Suspense fallback={null}>
+              <SectionCrumb items={items} />
+            </Suspense>
             </div>
             <div className="flex shrink-0 items-center gap-3">
-              <div role="group" aria-label={t.languageLabel} className="hidden items-center gap-1 text-sm md:flex">
-                {(Object.keys(LANGUAGES) as Language[]).map((code, i) => (
-                  <span key={code} className="flex items-center gap-1">
-                    {i > 0 && <span className="text-line" aria-hidden>|</span>}
-                    <button
-                      type="button"
-                      onClick={() => setLanguage(code)}
-                      aria-pressed={language === code}
-                      className={`rounded-sm px-1.5 py-1 transition-colors ${
-                        language === code ? "font-semibold text-ink underline decoration-accent decoration-2 underline-offset-4" : "text-muted hover:text-ink"
-                      }`}
-                    >
-                      {LANGUAGES[code].label}
-                    </button>
-                  </span>
-                ))}
-              </div>
+              <LanguageSelect className="max-md:hidden" />
               <motion.button
                 id="menu-button"
                 type="button"
@@ -143,14 +205,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                   <path d="M3 6h14M3 10h14M9 14h8" />
                 </svg>
                 {t.menu}
-                {asking && !isActive(pathname, "/briefing") && (
-                  <motion.span
-                    className="inline-block size-1.5 rounded-full bg-accent"
-                    animate={{ opacity: [1, 0.3, 1] }}
-                    transition={{ duration: 1.2, repeat: Infinity }}
-                    aria-hidden
-                  />
-                )}
+                <Suspense fallback={null}>
+                  <ResearchDot />
+                </Suspense>
               </motion.button>
             </div>
           </div>
@@ -178,17 +235,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             {t.menu}
           </span>
         </motion.button>
-        <MenuSheet
-          open={menuOpen}
-          origin={menuOrigin}
-          onClose={closeMenu}
-          returnFocusTo={menuButton}
-          items={items.map((item) => ({
-            ...item,
-            active: isActive(pathname, item.href),
-            badge: item.href === "/briefing" && asking && !isActive(pathname, item.href),
-          }))}
-        />
+        <Suspense fallback={null}>
+          <RoutedMenuSheet open={menuOpen} origin={menuOrigin} onClose={closeMenu} returnFocusTo={menuButton} items={items} />
+        </Suspense>
 
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6 sm:py-14">{children}</main>
 

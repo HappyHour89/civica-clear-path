@@ -255,11 +255,55 @@ export const ChargeSchema = z.strictObject({
   sources: z.array(SourceSchema),
 });
 
+// "Explain it more simply": a plainer retelling plus one everyday comparison.
+export const SimplerSchema = z.strictObject({
+  simpler: z.string().describe("The same explanation in very plain words a 10-year-old could follow. 3-5 short sentences. No new facts."),
+  analogy: z
+    .string()
+    .describe("One everyday comparison that makes the idea click, starting the way people naturally would in the answer language. Must not favor any side."),
+});
+
+export const PAPER_SECTIONS = ["federal", "state", "local", "courts", "elections", "economy"] as const;
+
+const StorySchema = z.strictObject({
+  section: z.enum(PAPER_SECTIONS),
+  headline: z.string().describe("Neutral, specific headline. No loaded words, no question marks, no clickbait."),
+  dek: z.string().describe("One plain sentence under the headline saying what happened."),
+  body: z.string().describe("2-4 plain sentences: what was decided or proposed, by whom, and what it changes."),
+  affects: z
+    .array(z.string())
+    .describe("Situation ids this story most affects, chosen only from: renter, homeowner, student, parent, worker, business, senior, veteran, immigrant, benefits. Empty if it's general."),
+  what_next: z.string().describe("The next step and its date if known (a vote, a hearing, a deadline), in plain words."),
+  date: z.string().describe("Date of the development, YYYY-MM-DD."),
+  source_ids: z.array(z.number().int()).describe("ids from `sources` supporting the story. At least one."),
+});
+
+// The personal newspaper: one edition per place and language, refreshed often.
+export const EditionSchema = z.strictObject({
+  lead: StorySchema.describe("The single most consequential development for readers in this place this week."),
+  stories: z.array(StorySchema).describe("5 to 8 more stories, a mix of federal, state, and local, most consequential first."),
+  upcoming: z
+    .array(
+      z.strictObject({
+        date: z.string().describe("YYYY-MM-DD"),
+        title: z.string().describe("What is being decided, in plain words."),
+        body: z.string().describe("Who decides it and why it matters, one sentence."),
+        how_to_take_part: z.string().describe("How a member of the public can comment, attend, or vote."),
+      }),
+    )
+    .describe("Hearings, votes, comment deadlines, or elections in the next 30 days where the public can take part. Only ones you found."),
+  quick_hits: z.array(z.string()).describe("Up to 5 one-sentence briefs on smaller developments."),
+  sources: z.array(SourceSchema),
+});
+
 export type Source = z.infer<typeof SourceSchema>;
 export type Briefing = z.infer<typeof BriefingSchema>;
 export type Comparison = z.infer<typeof CompareSchema>;
 export type Bill = z.infer<typeof BillSchema>;
 export type ChargeReport = z.infer<typeof ChargeSchema>;
+export type Simpler = z.infer<typeof SimplerSchema>;
+export type Edition = z.infer<typeof EditionSchema>;
+export type Story = z.infer<typeof StorySchema>;
 export type ForYouItem = z.infer<typeof ForYouItemSchema>;
 export type FollowUp = z.infer<typeof FollowUpSchema>;
 

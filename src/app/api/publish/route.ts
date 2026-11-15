@@ -46,6 +46,9 @@ export async function POST(request: Request) {
       status: "ai_draft",
       history: [{ at: now, note: "published" }],
       corrections: [],
+      review: null,
+      reviewerNote: "",
+      simplerSummary: "",
     };
     try {
       await savePage(page);

@@ -26,7 +26,7 @@ export async function askQuestion(
   if (input.situations.length) form.set("situations", input.situations.join(","));
   if (input.file) form.set("file", input.file);
   const response = await fetch("/api/ask", { method: "POST", body: form });
-  return (await readJson<{ briefing: Briefing }>(response, t, input.language)).briefing;
+  return readJson<{ briefing: Briefing; publishToken: string | null }>(response, t, input.language);
 }
 
 export async function fetchOfficials(state: string, address: string, t: Dictionary, language: Language) {
@@ -126,4 +126,16 @@ export async function explainCharges(
   if (input.situations.length) form.set("situations", input.situations.join(","));
   const response = await fetch("/api/charges", { method: "POST", body: form });
   return (await readJson<{ report: ChargeReport }>(response, t, input.language)).report;
+}
+
+export async function publishBriefing(
+  input: { briefing: Briefing; question: string; language: Language; token: string; includeQuestion: boolean },
+  t: Dictionary,
+) {
+  const response = await fetch("/api/publish", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, consent: true }),
+  });
+  return (await readJson<{ slug: string }>(response, t, input.language)).slug;
 }

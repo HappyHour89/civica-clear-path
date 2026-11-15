@@ -207,7 +207,7 @@ export function Claim(props: { text: string; sourceIds: number[]; b: { sources: 
   );
 }
 
-function Fact({ fact, b, t }: { fact: Briefing["key_facts"][number]; b: Briefing; t: Dictionary }) {
+export function Fact({ fact, b, t }: { fact: Briefing["key_facts"][number]; b: Briefing; t: Dictionary }) {
   const cited = b.sources.filter((s) => fact.source_ids.includes(s.id));
   return (
     <li className="space-y-1">

@@ -7,6 +7,7 @@ import { SITUATIONS, type Situation } from "@/lib/situations";
 import { US_STATES } from "@/lib/states";
 import { useCivica, type AskInput } from "./CivicaProvider";
 import { Button, Collapse, ProgressBar, Reveal, Stagger, StaggerItem } from "./motion";
+import { ResearchLive } from "./ResearchLive";
 import { cardClass, inputClass, PageIntro } from "./ui";
 
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
@@ -112,8 +113,9 @@ function SubmitRow() {
         {asking ? t.submitting : t.submit}
       </Button>
       <Collapse show={asking}>
-        <div role="status" className="space-y-2 pt-1">
+        <div role="status" className="space-y-3 pt-1">
           <ProgressBar />
+          <ResearchLive />
           <p className="flex justify-between gap-4 text-sm text-muted">
             <span>{t.loadingNote}</span>
             <span className="tabular-nums" aria-hidden>

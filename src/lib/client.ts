@@ -7,26 +7,64 @@ export type ChatTurn = { role: "user" | "assistant"; content: string; sources?: 
 async function readJson<T>(response: Response, t: Dictionary, language: Language): Promise<T> {
   const body = await response.json().catch(() => null);
   if (response.ok && body) return body as T;
-  // Server messages are English; show translated ones for the common cases.
-  if (response.status === 429) throw new Error(t.errorBusy);
-  if (response.status === 413) throw new Error(t.errorTooLarge);
-  if (response.status === 415) throw new Error(t.errorFileType);
-  const serverMessage = body && typeof body.error === "string" ? body.error : null;
-  throw new Error(language === "en" && serverMessage ? serverMessage : t.genericError);
+  throw errorFor(response.status, body && typeof body.error === "string" ? body.error : null, t, language);
 }
+
+// Server messages are English; show translated ones for the common cases.
+function errorFor(status: number, serverMessage: string | null, t: Dictionary, language: Language) {
+  if (status === 429) return new Error(t.errorBusy);
+  if (status === 413) return new Error(t.errorTooLarge);
+  if (status === 415) return new Error(t.errorFileType);
+  return new Error(language === "en" && serverMessage ? serverMessage : t.genericError);
+}
+
+export type ResearchStep =
+  | { type: "search"; query: string }
+  | { type: "source"; url: string; title: string }
+  | { type: "writing" };
+
+type AskAnswer = { briefing: Briefing; publishToken: string | null };
 
 export async function askQuestion(
   input: { question: string; file: File | null; language: Language; state: string; situations: string[] },
   t: Dictionary,
-) {
+  onStep?: (step: ResearchStep) => void,
+): Promise<AskAnswer> {
   const form = new FormData();
   form.set("question", input.question);
   form.set("language", input.language);
   form.set("state", input.state);
   if (input.situations.length) form.set("situations", input.situations.join(","));
   if (input.file) form.set("file", input.file);
+  form.set("stream", "1");
   const response = await fetch("/api/ask", { method: "POST", body: form });
-  return readJson<{ briefing: Briefing; publishToken: string | null }>(response, t, input.language);
+  const streamed = response.headers.get("Content-Type")?.includes("ndjson");
+  if (!response.ok || !streamed || !response.body) return readJson<AskAnswer>(response, t, input.language);
+
+  // One JSON object per line: progress steps, then "done" or "error".
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    buffer += value ?? "";
+    const lines = buffer.split("\n");
+    buffer = done ? "" : (lines.pop() ?? "");
+    for (const line of lines) {
+      let event: { type?: unknown; [key: string]: unknown };
+      try {
+        event = JSON.parse(line);
+      } catch {
+        continue; // blank keep-alive lines
+      }
+      if (event.type === "done") return { briefing: event.briefing as Briefing, publishToken: (event.publishToken as string) ?? null };
+      if (event.type === "error") {
+        const message = typeof event.message === "string" ? event.message : null;
+        throw errorFor(Number(event.status) || 500, message, t, input.language);
+      }
+      if (event.type === "search" || event.type === "source" || event.type === "writing") onStep?.(event as ResearchStep);
+    }
+    if (done) throw new Error(t.genericError);
+  }
 }
 
 export async function fetchOfficials(state: string, address: string, t: Dictionary, language: Language) {

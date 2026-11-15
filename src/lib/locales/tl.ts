@@ -26,6 +26,10 @@ export const tl: Dictionary = {
   submit: "Ipaliwanag",
   submitting: "Nagsasaliksik…",
   loadingNote: "Naghahanap ng mga source at sumusulat ng balanseng paliwanag. Karaniwang 30–90 segundo ito.",
+  progressStarting: "Sinisimulan ang pananaliksik…",
+  progressSearching: "Hinahanap",
+  progressSources: "Mga source na nahanap",
+  progressWriting: "Isinusulat ang iyong briefing…",
   examplesLabel: "Subukan ang isang halimbawa",
   personalTitle: "Ano ang magbabago para sa iyo? (opsyonal)",
   personalHint:

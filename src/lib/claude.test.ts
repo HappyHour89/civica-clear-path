@@ -402,6 +402,58 @@ describe("POST /api/ask", () => {
     });
   }
 
+  // A stand-in for client.beta.messages.stream(): replays the message's
+  // blocks to the registered listeners, then resolves with the message.
+  function mockStream(message: FakeMessage) {
+    return vi.spyOn(Messages.prototype, "stream").mockImplementation((() => {
+      const listeners: Record<string, ((...args: unknown[]) => void)[]> = {};
+      const stream = {
+        on(name: string, listener: (...args: unknown[]) => void) {
+          (listeners[name] ??= []).push(listener);
+          return stream;
+        },
+        async finalMessage() {
+          for (const block of message.content) {
+            for (const l of listeners.streamEvent ?? []) l({ type: "content_block_start", index: 0, content_block: block });
+            for (const l of listeners.contentBlock ?? []) l(block);
+          }
+          return message;
+        },
+      };
+      return stream;
+    }) as never);
+  }
+
+  it("streams searches, sources and the finished briefing as lines of JSON", async () => {
+    mockStream({
+      stop_reason: "tool_use",
+      content: [
+        { type: "server_tool_use", id: "srvtoolu_1", name: "web_search", input: { query: "filibuster rules" } },
+        searchResult("https://www.senate.gov/about/powers-procedures/filibusters-cloture.htm"),
+        toolCall("submit_briefing", sampleBriefing),
+      ],
+    });
+    const response = await askRoute(
+      askRequest({ question: "What is the filibuster?", language: "en", state: "", stream: "1" }, "10.0.0.9"),
+    );
+    expect(response.headers.get("Content-Type")).toContain("application/x-ndjson");
+    const lines = (await response.text())
+      .split("\n")
+      .filter((line) => line.trim())
+      .map((line) => JSON.parse(line));
+    expect(lines.map((line) => line.type)).toEqual(["search", "source", "writing", "done"]);
+    expect(lines[0].query).toBe("filibuster rules");
+    expect(lines[1].url).toContain("senate.gov");
+    expect(lines.at(-1).briefing.sources.map((s: { id: number }) => s.id)).toEqual([1]);
+  });
+
+  it("reports a failure inside the stream as an error line", async () => {
+    mockStream({ stop_reason: "refusal", content: [] });
+    const response = await askRoute(askRequest({ question: "q", language: "en", state: "", stream: "1" }, "10.0.0.10"));
+    const last = JSON.parse((await response.text()).trim().split("\n").at(-1)!);
+    expect(last).toMatchObject({ type: "error", status: 422 });
+  });
+
   it("drops unverified sources and unsafe links before responding", async () => {
     const spy = mockResponses({
       stop_reason: "tool_use",

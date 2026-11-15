@@ -25,6 +25,10 @@ export const es: Dictionary = {
   submit: "Explícalo",
   submitting: "Investigando…",
   loadingNote: "Buscando fuentes y escribiendo una explicación equilibrada. Suele tardar entre 30 y 90 segundos.",
+  progressStarting: "Iniciando la investigación…",
+  progressSearching: "Buscando",
+  progressSources: "Fuentes encontradas",
+  progressWriting: "Escribiendo tu resumen…",
   examplesLabel: "Prueba un ejemplo",
   personalTitle: "¿Qué cambia para ti? (opcional)",
   personalHint:

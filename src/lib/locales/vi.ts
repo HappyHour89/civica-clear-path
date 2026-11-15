@@ -25,6 +25,10 @@ export const vi: Dictionary = {
   submit: "Giải thích",
   submitting: "Đang tìm hiểu…",
   loadingNote: "Đang tìm nguồn và viết lời giải thích cân bằng. Thường mất 30–90 giây.",
+  progressStarting: "Đang bắt đầu tìm hiểu…",
+  progressSearching: "Đang tìm",
+  progressSources: "Nguồn đã tìm thấy",
+  progressWriting: "Đang viết bản tóm tắt cho bạn…",
   examplesLabel: "Thử một ví dụ",
   personalTitle: "Điều gì thay đổi với bạn? (không bắt buộc)",
   personalHint:

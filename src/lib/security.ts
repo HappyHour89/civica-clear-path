@@ -68,10 +68,15 @@ export async function sendSecurityAlert(text: string) {
   const url = process.env.SECURITY_ALERT_WEBHOOK_URL;
   if (!url?.startsWith("https://")) return;
   try {
+    // ntfy shows the request body as the notification, so it gets plain text;
+    // Slack reads "text" and Discord reads "content" from JSON.
+    const ntfy = new URL(url).hostname === "ntfy.sh";
     await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, content: text }),
+      headers: ntfy
+        ? { "Content-Type": "text/plain; charset=utf-8", Title: "Civica security alert", Tags: "warning" }
+        : { "Content-Type": "application/json" },
+      body: ntfy ? text : JSON.stringify({ text, content: text }),
       signal: AbortSignal.timeout(5000),
     });
   } catch (error) {

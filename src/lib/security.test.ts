@@ -144,6 +144,15 @@ describe("review desk sign-in", () => {
     expect(String(fetchSpy.mock.calls[0][1]?.body)).toContain("wrong review-desk passcode");
   });
 
+  it("sends ntfy alerts as plain text so the phone notification is readable", async () => {
+    process.env.SECURITY_ALERT_WEBHOOK_URL = "https://ntfy.sh/civica-test-topic";
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("ok"));
+    await security.sendSecurityAlert("Civica: wrong review-desk passcode");
+    const init = fetchSpy.mock.calls[0][1]!;
+    expect(init.body).toBe("Civica: wrong review-desk passcode");
+    expect((init.headers as Record<string, string>).Title).toBe("Civica security alert");
+  });
+
   it("locks an address out after 10 wrong passcodes, across servers", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const tag = security.addressTag(new Request("https://x", { headers: { "x-forwarded-for": "198.51.100.4" } }));

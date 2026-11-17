@@ -71,7 +71,7 @@ export async function sendSecurityAlert(text: string) {
     // ntfy shows the request body as the notification, so it gets plain text;
     // Slack reads "text" and Discord reads "content" from JSON.
     const ntfy = new URL(url).hostname === "ntfy.sh";
-    await fetch(url, {
+    const response = await fetch(url, {
       method: "POST",
       headers: ntfy
         ? { "Content-Type": "text/plain; charset=utf-8", Title: "Civica security alert", Tags: "warning" }
@@ -79,6 +79,8 @@ export async function sendSecurityAlert(text: string) {
       body: ntfy ? text : JSON.stringify({ text, content: text }),
       signal: AbortSignal.timeout(5000),
     });
+    // A refused alert (e.g. 429 "too many requests") is logged, not silent.
+    if (!response.ok) console.error("Security alert was refused", { status: response.status, host: new URL(url).hostname });
   } catch (error) {
     console.error("Security alert failed to send", error instanceof Error ? error.message : error);
   }

@@ -153,6 +153,14 @@ describe("review desk sign-in", () => {
     expect((init.headers as Record<string, string>).Title).toBe("Civica security alert");
   });
 
+  it("logs an alert the service refuses", async () => {
+    process.env.SECURITY_ALERT_WEBHOOK_URL = "https://ntfy.sh/civica-test-topic";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("slow down", { status: 429 }));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    await security.sendSecurityAlert("x");
+    expect(JSON.stringify(error.mock.calls)).toContain("429");
+  });
+
   it("locks an address out after 10 wrong passcodes, across servers", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const tag = security.addressTag(new Request("https://x", { headers: { "x-forwarded-for": "198.51.100.4" } }));

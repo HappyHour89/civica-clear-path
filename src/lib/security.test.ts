@@ -153,11 +153,29 @@ describe("review desk sign-in", () => {
     expect((init.headers as Record<string, string>).Title).toBe("Civica security alert");
   });
 
+  it("accepts the alert setting typed with spaces, quotes or no https://", () => {
+    expect(security.alertUrl('  "https://ntfy.sh/civica-x"  ')?.href).toBe("https://ntfy.sh/civica-x");
+    expect(security.alertUrl("ntfy.sh/civica-x")?.href).toBe("https://ntfy.sh/civica-x");
+    expect(security.alertUrl("http://ntfy.sh/civica-x")).toBeNull();
+    expect(security.alertUrl("")).toBeNull();
+  });
+
+  it("retries once when the alert service is busy", async () => {
+    process.env.SECURITY_ALERT_WEBHOOK_URL = "https://ntfy.sh/civica-test-topic";
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response("slow down", { status: 429 }))
+      .mockResolvedValueOnce(new Response("ok"));
+    await security.sendSecurityAlert("x", 0);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
   it("logs an alert the service refuses", async () => {
     process.env.SECURITY_ALERT_WEBHOOK_URL = "https://ntfy.sh/civica-test-topic";
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("slow down", { status: 429 }));
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    await security.sendSecurityAlert("x");
+    await security.sendSecurityAlert("x", 0);
     expect(JSON.stringify(error.mock.calls)).toContain("429");
   });
 

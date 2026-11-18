@@ -69,14 +69,30 @@ export async function recordFailedLogin(request: Request, tag: string, before: F
 
 // Posts to SECURITY_ALERT_WEBHOOK_URL if set: a Slack or Discord incoming
 // webhook, or an ntfy.sh topic for phone notifications. Never throws.
-export async function sendSecurityAlert(text: string) {
-  const url = process.env.SECURITY_ALERT_WEBHOOK_URL;
-  if (!url?.startsWith("https://")) return;
+// Forgiving about how the setting was typed: surrounding spaces or quotes are
+// dropped, and a missing "https://" is added. Only https URLs are used.
+export function alertUrl(raw = process.env.SECURITY_ALERT_WEBHOOK_URL): URL | null {
+  const value = (raw ?? "").trim().replace(/^["']+|["']+$/g, "").trim();
+  if (!value) return null;
   try {
-    // ntfy shows the request body as the notification, so it gets plain text;
-    // Slack reads "text" and Discord reads "content" from JSON.
-    const ntfy = new URL(url).hostname === "ntfy.sh";
-    const response = await fetch(url, {
+    const url = new URL(/^[a-z]+:\/\//i.test(value) ? value : `https://${value}`);
+    return url.protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function sendSecurityAlert(text: string, retryDelayMs = 1500) {
+  const url = alertUrl();
+  if (!url) {
+    console.warn("Security alerts are off: SECURITY_ALERT_WEBHOOK_URL is missing or not a valid https URL.");
+    return;
+  }
+  // ntfy shows the request body as the notification, so it gets plain text;
+  // Slack reads "text" and Discord reads "content" from JSON.
+  const ntfy = url.hostname === "ntfy.sh";
+  const send = () =>
+    fetch(url, {
       method: "POST",
       headers: ntfy
         ? { "Content-Type": "text/plain; charset=utf-8", Title: "Civica security alert", Tags: "warning" }
@@ -84,8 +100,15 @@ export async function sendSecurityAlert(text: string) {
       body: ntfy ? text : JSON.stringify({ text, content: text }),
       signal: AbortSignal.timeout(5000),
     });
-    // A refused alert (e.g. 429 "too many requests") is logged, not silent.
-    if (!response.ok) console.error("Security alert was refused", { status: response.status, host: new URL(url).hostname });
+  try {
+    let response = await send();
+    // Busy shared servers can be told "too many requests"; try once more.
+    if (response.status === 429 || response.status >= 500) {
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+      response = await send();
+    }
+    if (response.ok) console.info("Security alert sent", { host: url.hostname });
+    else console.error("Security alert was refused", { status: response.status, host: url.hostname });
   } catch (error) {
     console.error("Security alert failed to send", error instanceof Error ? error.message : error);
   }

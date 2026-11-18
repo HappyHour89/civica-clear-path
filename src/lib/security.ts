@@ -14,11 +14,16 @@ export const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 export const MAX_FAILURES_PER_ADDRESS = 10;
 export const MAX_FAILURES_TOTAL = 60;
 
-export function addressTag(request: Request) {
+// A short keyed hash of the visitor's internet address, never the address.
+export function addressHash(request: Request, purpose: string) {
   return createHash("sha256")
-    .update(`login|${serverSecret() ?? ""}|${clientKey(request)}`)
+    .update(`${purpose}|${serverSecret() ?? ""}|${clientKey(request)}`)
     .digest("hex")
     .slice(0, 12);
+}
+
+export function addressTag(request: Request) {
+  return addressHash(request, "login");
 }
 
 export type FailureCounts = { fromAddress: number; total: number };
@@ -94,6 +99,8 @@ export async function cleanUpSecurityFiles(now = Date.now()) {
   for (const [prefix, maxAge] of [
     [FAILURES, 7 * 24 * 3_600_000],
     ["uploads/", 3_600_000],
+    ["ai-calls/", 24 * 3_600_000],
+    ["ai-spend/", 100 * 24 * 3_600_000],
   ] as const) {
     let cursor: string | undefined;
     do {

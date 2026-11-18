@@ -9,6 +9,7 @@ import { parseSituations } from "@/lib/situations";
 import { isSafeHttpUrl, verifySources } from "@/lib/sources";
 import { isStateCode } from "@/lib/states";
 import { fileToContentBlock, readUpload } from "@/lib/upload";
+import { guardAiRequest } from "@/lib/budget";
 
 export const maxDuration = 300;
 
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
     }
     const hasFile = file !== null;
     if (!question && !hasFile) throw new CivicaError("Type a question or upload a file.", 400);
+    await guardAiRequest(request);
 
     const content: Anthropic.Beta.BetaContentBlockParam[] = [];
     if (file) content.push(await fileToContentBlock(file));
@@ -67,7 +69,7 @@ type BriefingAnswer = Awaited<ReturnType<typeof buildBriefing>>;
 type StreamLine =
   | ResearchProgress
   | ({ type: "done" } & BriefingAnswer)
-  | { type: "error"; message: string; status: number };
+  | { type: "error"; message: string; status: number; code?: string };
 
 function streamAnswer(answer: (onProgress: (event: ResearchProgress) => void) => Promise<BriefingAnswer>) {
   const encoder = new TextEncoder();
@@ -86,8 +88,8 @@ function streamAnswer(answer: (onProgress: (event: ResearchProgress) => void) =>
         send({ type: "done", ...(await answer(send)) });
       } catch (error) {
         const response = errorResponse(error);
-        const { error: message } = (await response.json()) as { error: string };
-        send({ type: "error", message, status: response.status });
+        const { error: message, code } = (await response.json()) as { error: string; code?: string };
+        send({ type: "error", message, status: response.status, ...(code && { code }) });
       } finally {
         clearInterval(heartbeat);
         try {

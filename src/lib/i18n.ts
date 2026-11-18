@@ -101,6 +101,7 @@ const en = {
   errorBusy: "You've reached the limit for now, or Civica is busy. Please wait a few minutes and try again.",
   errorTooLarge: "That file or conversation is too large. Try a smaller file or start a new question.",
   uploadFailed: "The file couldn't be uploaded. Check your connection and try again.",
+  errorBudget: "Civica has used its AI budget for this month, so new questions are paused until next month. Published pages and the library still work.",
   errorFileType: "Unsupported file. Upload a PDF, an image, or a plain-text file.",
   summary: "Plain-language summary",
   whatItDoes: "What it actually does",
@@ -481,7 +482,7 @@ const en = {
     "Civica exists because the documents that shape your life — bills, ballot measures, court notices — are written for lawyers, not for you.",
     "Ask a question or upload a document, and Civica explains it in plain language: what it is, what it does, and why people disagree about it. Every major viewpoint gets its strongest version, side by side. Civica never tells you what to conclude.",
     "Key facts link to sources retrieved while answering your question. Anything that couldn't be tied to a source is labeled.",
-    "Civica doesn't save your questions, files, or address. Your state and language are remembered only in your own browser. If you join the Premium waitlist, your email is stored privately for that purpose only. Civica is an educational tool, not legal advice. AI can make mistakes, so check the sources.",
+    "Civica doesn't save your questions, files, or address. Your state and language are remembered only in your own browser. If you join the Premium waitlist, your email is stored privately for that purpose only. Visits are counted anonymously, with no cookies or personal details, to see which pages people use. Civica is an educational tool, not legal advice. AI can make mistakes, so check the sources.",
   ],
 };
 
@@ -557,6 +558,7 @@ const ko: Dictionary = {
   errorBusy: "이용 한도에 도달했거나 서비스가 혼잡합니다. 몇 분 후 다시 시도해 주세요.",
   errorTooLarge: "파일이나 대화가 너무 큽니다. 더 작은 파일을 사용하거나 새로 질문해 주세요.",
   uploadFailed: "파일을 업로드하지 못했습니다. 연결을 확인하고 다시 시도해 주세요.",
+  errorBudget: "Civica가 이번 달 AI 예산을 모두 사용해 다음 달까지 새 질문을 받을 수 없습니다. 게시된 페이지와 라이브러리는 계속 이용할 수 있습니다.",
   errorFileType: "지원하지 않는 파일입니다. PDF, 이미지, 텍스트 파일을 업로드하세요.",
   summary: "쉬운 요약",
   whatItDoes: "실제로 하는 일",
@@ -932,7 +934,7 @@ const ko: Dictionary = {
     "법안, 주민투표 안건, 법원 통지서처럼 우리 삶을 좌우하는 문서는 일반인이 아니라 법률가를 위해 쓰여 있습니다. Civica는 그래서 만들어졌습니다.",
     "질문하거나 문서를 업로드하면 Civica가 쉬운 말로 설명합니다. 무엇인지, 무엇을 하는지, 사람들이 왜 의견이 다른지. 주요 관점마다 가장 강력한 논거를 나란히 보여 주며, 어떤 결론을 내려야 하는지는 절대 말하지 않습니다.",
     "핵심 사실은 질문에 답하는 동안 실제로 검색된 출처와 연결됩니다. 출처를 확인하지 못한 내용은 따로 표시됩니다.",
-    "Civica는 질문, 파일, 주소를 저장하지 않습니다. 거주 주와 언어 설정은 사용자의 브라우저에만 저장됩니다. 프리미엄 대기자 명단에 등록하면 이메일만 해당 목적으로 비공개 저장됩니다. Civica는 교육용 도구이며 법률 자문이 아닙니다. AI는 실수할 수 있으니 출처를 확인하세요.",
+    "Civica는 질문, 파일, 주소를 저장하지 않습니다. 거주 주와 언어 설정은 사용자의 브라우저에만 저장됩니다. 프리미엄 대기자 명단에 등록하면 이메일만 해당 목적으로 비공개 저장됩니다. 어떤 페이지가 쓰이는지 알기 위해 쿠키나 개인정보 없이 방문 수만 익명으로 셉니다. Civica는 교육용 도구이며 법률 자문이 아닙니다. AI는 실수할 수 있으니 출처를 확인하세요.",
   ],
 };
 

@@ -82,6 +82,7 @@ export const es: Dictionary = {
   errorBusy: "Llegaste al límite por ahora, o Civica está ocupada. Espera unos minutos e inténtalo de nuevo.",
   errorTooLarge: "El archivo o la conversación es demasiado grande. Prueba con un archivo más pequeño o empieza una pregunta nueva.",
   uploadFailed: "No se pudo subir el archivo. Revisa tu conexión e inténtalo de nuevo.",
+  errorBudget: "Civica ya usó su presupuesto de IA de este mes, así que las preguntas nuevas están en pausa hasta el próximo mes. Las páginas publicadas y la biblioteca siguen funcionando.",
   errorFileType: "Archivo no compatible. Sube un PDF, una imagen o un archivo de texto.",
   summary: "Resumen en lenguaje sencillo",
   whatItDoes: "Lo que realmente hace",
@@ -463,6 +464,6 @@ export const es: Dictionary = {
     "Civica existe porque los documentos que marcan tu vida (proyectos de ley, medidas electorales, avisos judiciales) están escritos para abogados, no para ti.",
     "Haz una pregunta o sube un documento, y Civica te lo explica en lenguaje sencillo: qué es, qué hace y por qué la gente no está de acuerdo. Cada punto de vista importante aparece en su mejor versión, lado a lado. Civica nunca te dice qué concluir.",
     "Los datos clave enlazan a fuentes consultadas al responder tu pregunta. Todo lo que no se pudo vincular a una fuente queda marcado.",
-    "Civica no guarda tus preguntas, archivos ni dirección. Tu estado e idioma se recuerdan solo en tu propio navegador. Si te unes a la lista de espera de Premium, tu correo se guarda de forma privada solo para ese fin. Civica es una herramienta educativa, no asesoría legal. La IA puede equivocarse, así que revisa las fuentes.",
+    "Civica no guarda tus preguntas, archivos ni dirección. Tu estado e idioma se recuerdan solo en tu propio navegador. Si te unes a la lista de espera de Premium, tu correo se guarda de forma privada solo para ese fin. Las visitas se cuentan de forma anónima, sin cookies ni datos personales, para saber qué páginas se usan. Civica es una herramienta educativa, no asesoría legal. La IA puede equivocarse, así que revisa las fuentes.",
   ],
 };

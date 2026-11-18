@@ -7,6 +7,7 @@ import { describeRequestContext } from "@/lib/prompts";
 import { BriefingSchema, FollowUpSchema } from "@/lib/schemas";
 import { verifySources } from "@/lib/sources";
 import { isStateCode } from "@/lib/states";
+import { guardAiRequest } from "@/lib/budget";
 
 export const maxDuration = 300;
 
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
       },
     ];
 
+    await guardAiRequest(request);
     const { data, searchedUrls, pageAges } = await research({
       messages,
       toolName: "submit_answer",

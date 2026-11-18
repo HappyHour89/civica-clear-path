@@ -3,6 +3,7 @@ import type { z } from "zod";
 import { SYSTEM_PROMPT } from "./prompts";
 import { collectSearchResultUrls } from "./sources";
 import { toolInputSchema } from "./schemas";
+import { recordSpend } from "./budget";
 
 const MAX_ROUNDS = 5;
 // Per API call. A full answer with web search usually takes 60–90 seconds;
@@ -13,6 +14,8 @@ export class CivicaError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    // A machine-readable reason the page can translate, e.g. "budget".
+    readonly code?: string,
   ) {
     super(message);
   }
@@ -186,7 +189,7 @@ async function researchWithTools<T>(
         console.error("Claude returned an invalid answer shape", parsed.error.issues);
         throw new CivicaError("The answer came back in an unexpected format. Please try again.", 502);
       }
-      logUsage(provider, options.toolName, usage);
+      await recordSpend(logUsage(provider, options.toolName, usage));
       return { data: parsed.data, searchedUrls, pageAges };
     }
 
@@ -232,6 +235,7 @@ function logUsage(provider: Provider, feature: string, u: UsageTotals) {
         u.searches * PRICES.search
       : null;
   console.info("AI usage", { feature, model: provider.model, ...u, estimatedUsd: cost === null ? null : Number(cost.toFixed(4)) });
+  return cost;
 }
 
 // Same request as messages.create, but streamed so each search, each source

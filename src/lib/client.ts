@@ -9,11 +9,12 @@ export type ChatTurn = { role: "user" | "assistant"; content: string; sources?: 
 async function readJson<T>(response: Response, t: Dictionary, language: Language): Promise<T> {
   const body = await response.json().catch(() => null);
   if (response.ok && body) return body as T;
-  throw errorFor(response.status, body && typeof body.error === "string" ? body.error : null, t, language);
+  throw errorFor(response.status, body && typeof body.error === "string" ? body.error : null, t, language, body?.code);
 }
 
 // Server messages are English; show translated ones for the common cases.
-function errorFor(status: number, serverMessage: string | null, t: Dictionary, language: Language) {
+function errorFor(status: number, serverMessage: string | null, t: Dictionary, language: Language, code?: unknown) {
+  if (code === "budget") return new Error(t.errorBudget);
   if (status === 429) return new Error(t.errorBusy);
   if (status === 413) return new Error(t.errorTooLarge);
   if (status === 415) return new Error(t.errorFileType);
@@ -61,7 +62,7 @@ export async function askQuestion(
       if (event.type === "done") return { briefing: event.briefing as Briefing, publishToken: (event.publishToken as string) ?? null };
       if (event.type === "error") {
         const message = typeof event.message === "string" ? event.message : null;
-        throw errorFor(Number(event.status) || 500, message, t, input.language);
+        throw errorFor(Number(event.status) || 500, message, t, input.language, event.code);
       }
       if (event.type === "search" || event.type === "source" || event.type === "writing") onStep?.(event as ResearchStep);
     }

@@ -8,6 +8,7 @@ import { parseSituations } from "@/lib/situations";
 import { normalizeUrl, verifySources } from "@/lib/sources";
 import { isStateCode } from "@/lib/states";
 import { fileToContentBlock, readUpload } from "@/lib/upload";
+import { guardAiRequest } from "@/lib/budget";
 
 export const maxDuration = 300;
 
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
       throw new CivicaError("Upload a bill or paste its text.", 400);
     }
 
+    await guardAiRequest(request);
     const { data, searchedUrls, pageAges } = await research({
       messages: [
         {

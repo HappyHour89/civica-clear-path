@@ -6,6 +6,7 @@ import { describeRequestContext } from "@/lib/prompts";
 import { BillSchema } from "@/lib/schemas";
 import { normalizeUrl, verifySources } from "@/lib/sources";
 import { isStateCode } from "@/lib/states";
+import { guardAiRequest } from "@/lib/budget";
 
 export const maxDuration = 300;
 
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
       throw new CivicaError("Type a bill number or name.", 400);
     }
 
+    await guardAiRequest(request);
     const { data, searchedUrls, pageAges } = await research({
       messages: [
         {

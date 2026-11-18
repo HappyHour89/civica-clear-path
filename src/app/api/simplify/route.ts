@@ -6,6 +6,7 @@ import { LANGUAGES, type Language } from "@/lib/i18n";
 import { describeRequestContext } from "@/lib/prompts";
 import { getPage, isSlug, readJson, verifyBriefing } from "@/lib/publicPages";
 import { BriefingSchema, SimplerSchema, type Briefing, type Simpler } from "@/lib/schemas";
+import { guardAiRequest } from "@/lib/budget";
 
 export const maxDuration = 120;
 
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
       const path = `simpler/${page.slug}.json`;
       const cached = SimplerSchema.safeParse(await readJson(path).catch(() => null));
       if (cached.success) return Response.json({ simpler: cached.data });
+      await guardAiRequest(request);
       const simpler = await simplify(page.briefing, page.language);
       await put(path, JSON.stringify(simpler), {
         access: "private",
@@ -74,6 +76,7 @@ export async function POST(request: Request) {
     if (!verifyBriefing({ briefing: input.briefing, question: input.question, language: input.language }, input.token)) {
       throw new CivicaError("Only explanations Civica wrote can be simplified.", 403);
     }
+    await guardAiRequest(request);
     return Response.json({ simpler: await simplify(input.briefing, input.language) });
   } catch (error) {
     return errorResponse(error);

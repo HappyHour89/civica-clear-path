@@ -82,6 +82,7 @@ export const vi: Dictionary = {
   errorBusy: "Bạn đã đạt giới hạn tạm thời, hoặc Civica đang bận. Vui lòng chờ vài phút rồi thử lại.",
   errorTooLarge: "Tệp hoặc cuộc trò chuyện quá lớn. Hãy thử tệp nhỏ hơn hoặc đặt câu hỏi mới.",
   uploadFailed: "Không tải tệp lên được. Hãy kiểm tra kết nối rồi thử lại.",
+  errorBudget: "Civica đã dùng hết ngân sách AI của tháng này nên tạm ngưng nhận câu hỏi mới đến tháng sau. Các trang đã đăng và thư viện vẫn hoạt động.",
   errorFileType: "Tệp không được hỗ trợ. Hãy tải lên tệp PDF, hình ảnh hoặc văn bản thuần.",
   summary: "Tóm tắt dễ hiểu",
   whatItDoes: "Nó thực sự làm gì",
@@ -461,6 +462,6 @@ export const vi: Dictionary = {
     "Civica ra đời vì những văn bản định hình cuộc sống của bạn (dự luật, đề xuất trên lá phiếu, thông báo của tòa án) được viết cho luật sư, không phải cho bạn.",
     "Hãy đặt câu hỏi hoặc tải lên tài liệu, Civica sẽ giải thích bằng lời dễ hiểu: nó là gì, làm gì và vì sao mọi người bất đồng. Mỗi quan điểm chính được trình bày ở dạng mạnh nhất, đặt song song. Civica không bao giờ bảo bạn phải kết luận gì.",
     "Các dữ kiện chính dẫn đến nguồn được tìm khi trả lời câu hỏi của bạn. Điều gì không gắn được với nguồn đều được ghi rõ.",
-    "Civica không lưu câu hỏi, tệp hay địa chỉ của bạn. Tiểu bang và ngôn ngữ của bạn chỉ được ghi nhớ trong trình duyệt của chính bạn. Nếu bạn tham gia danh sách chờ Premium, email của bạn được lưu riêng tư chỉ cho mục đích đó. Civica là công cụ giáo dục, không phải tư vấn pháp lý. AI có thể sai, vì vậy hãy kiểm tra các nguồn.",
+    "Civica không lưu câu hỏi, tệp hay địa chỉ của bạn. Tiểu bang và ngôn ngữ của bạn chỉ được ghi nhớ trong trình duyệt của chính bạn. Nếu bạn tham gia danh sách chờ Premium, email của bạn được lưu riêng tư chỉ cho mục đích đó. Lượt truy cập được đếm ẩn danh, không dùng cookie hay thông tin cá nhân, để biết trang nào được dùng. Civica là công cụ giáo dục, không phải tư vấn pháp lý. AI có thể sai, vì vậy hãy kiểm tra các nguồn.",
   ],
 };

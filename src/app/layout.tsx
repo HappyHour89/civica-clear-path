@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { CivicaProvider } from "@/components/CivicaProvider";
 import { SiteShell } from "@/components/SiteShell";
 import "@fontsource-variable/source-serif-4";
@@ -36,6 +37,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <CivicaProvider>
           <SiteShell>{children}</SiteShell>
         </CivicaProvider>
+        {/* Anonymous, cookie-free page-view counts (Vercel Web Analytics). */}
+        <Analytics />
       </body>
     </html>
   );

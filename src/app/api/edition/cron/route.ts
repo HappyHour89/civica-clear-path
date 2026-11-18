@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { generateEdition, type Region } from "@/lib/editions";
 import type { Language } from "@/lib/i18n";
 import { cleanUpSecurityFiles } from "@/lib/security";
+import { withinBudget } from "@/lib/budget";
 
 export const maxDuration = 300;
 
@@ -19,11 +20,14 @@ export async function GET(request: Request) {
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return new Response("Unauthorized", { status: 401 });
   }
+  // The newspaper may use at most half the monthly AI budget.
+  const affordable = await withinBudget(0.5);
   const [cleanUp, ...results] = await Promise.allSettled([
     cleanUpSecurityFiles(),
-    ...EDITIONS.map(([region, language]) => generateEdition(region, language)),
+    ...(affordable ? EDITIONS.map(([region, language]) => generateEdition(region, language)) : []),
   ]);
   return Response.json({
+    skippedForBudget: !affordable,
     refreshed: results.map((r, i) => ({ edition: EDITIONS[i].join("-"), ok: r.status === "fulfilled" })),
     cleanedUp: cleanUp.status === "fulfilled" ? cleanUp.value.deleted : null,
   });

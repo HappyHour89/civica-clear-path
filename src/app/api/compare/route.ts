@@ -8,6 +8,7 @@ import { parseSituations } from "@/lib/situations";
 import { verifySources } from "@/lib/sources";
 import { isStateCode } from "@/lib/states";
 import { fileToContentBlock, MAX_UPLOAD_BYTES, readUpload } from "@/lib/upload";
+import { guardAiRequest } from "@/lib/budget";
 
 export const maxDuration = 300;
 
@@ -76,6 +77,7 @@ export async function POST(request: Request) {
       },
     ];
 
+    await guardAiRequest(request);
     const { data, searchedUrls, pageAges } = await research({
       messages: [{ role: "user", content }],
       toolName: "submit_comparison",

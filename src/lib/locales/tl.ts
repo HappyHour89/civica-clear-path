@@ -83,6 +83,7 @@ export const tl: Dictionary = {
   errorBusy: "Naabot mo na ang limitasyon sa ngayon, o abala ang Civica. Maghintay ng ilang minuto at subukan ulit.",
   errorTooLarge: "Masyadong malaki ang file o usapan. Subukan ang mas maliit na file o magsimula ng bagong tanong.",
   uploadFailed: "Hindi na-upload ang file. Tingnan ang iyong koneksyon at subukang muli.",
+  errorBudget: "Naubos na ng Civica ang AI budget nito ngayong buwan, kaya nakahinto ang mga bagong tanong hanggang sa susunod na buwan. Gumagana pa rin ang mga nai-publish na pahina at ang library.",
   errorFileType: "Hindi suportado ang file. Mag-upload ng PDF, larawan, o plain text file.",
   summary: "Buod sa simpleng salita",
   whatItDoes: "Ano talaga ang ginagawa nito",
@@ -464,6 +465,6 @@ export const tl: Dictionary = {
     "Umiiral ang Civica dahil ang mga dokumentong humuhubog sa buhay mo (mga bill, ballot measure, abiso ng korte) ay isinulat para sa mga abogado, hindi para sa iyo.",
     "Magtanong o mag-upload ng dokumento, at ipapaliwanag ito ng Civica sa simpleng salita: ano ito, ano ang ginagawa nito, at bakit hindi nagkakasundo ang mga tao. Ipinapakita ang pinakamatibay na bersyon ng bawat pangunahing pananaw, magkakatabi. Hindi kailanman sinasabi ng Civica kung ano ang dapat mong isipin.",
     "May link ang mahahalagang katotohanan sa mga source na nakuha habang sinasagot ang tanong mo. Minamarkahan ang anumang hindi maiugnay sa isang source.",
-    "Hindi itinatago ng Civica ang mga tanong, file, o address mo. Ang estado at wika mo ay tinatandaan lang sa sarili mong browser. Kung sasali ka sa waitlist ng Premium, pribadong itatago ang email mo para lang doon. Ang Civica ay kasangkapang pang-edukasyon, hindi legal na payo. Maaaring magkamali ang AI, kaya tingnan ang mga source.",
+    "Hindi itinatago ng Civica ang mga tanong, file, o address mo. Ang estado at wika mo ay tinatandaan lang sa sarili mong browser. Kung sasali ka sa waitlist ng Premium, pribadong itatago ang email mo para lang doon. Anonimong binibilang ang mga pagbisita, walang cookies o personal na detalye, para malaman kung aling mga pahina ang ginagamit. Ang Civica ay kasangkapang pang-edukasyon, hindi legal na payo. Maaaring magkamali ang AI, kaya tingnan ang mga source.",
   ],
 };

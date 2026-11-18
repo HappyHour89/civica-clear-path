@@ -2,6 +2,7 @@ import { after, connection } from "next/server";
 import { CivicaError } from "@/lib/claude";
 import { claimRefresh, generateEdition, isFresh, parseEditionKey, readEdition } from "@/lib/editions";
 import { errorResponse } from "@/lib/http";
+import { withinBudget } from "@/lib/budget";
 
 export const maxDuration = 300;
 
@@ -20,7 +21,9 @@ export async function GET(request: Request) {
     const stored = await readEdition(key.region, key.language);
     const fresh = isFresh(stored);
     let refreshing = false;
-    if (!fresh && (await claimRefresh(key.region, key.language))) {
+    // The newspaper may use at most half the monthly AI budget.
+    const affordable = !fresh && (await withinBudget(0.5));
+    if (affordable && (await claimRefresh(key.region, key.language))) {
       refreshing = true;
       after(async () => {
         try {
@@ -29,7 +32,7 @@ export async function GET(request: Request) {
           console.error("Edition refresh failed", key, error instanceof Error ? error.message : error);
         }
       });
-    } else if (!fresh) {
+    } else if (!fresh && affordable) {
       refreshing = true; // another request is already writing it
     }
     return Response.json(
